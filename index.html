@@ -357,15 +357,16 @@
             return;
         }
         
+        // Mostrar la lista de libros y el botón de confirmar
         entregaInfoDiv.innerHTML = `
             <div class="card">
                 <h4>📦 Libros a entregar (${prestamos.length})</h4>
                 ${prestamos.map(p => `<div class="libro-item">📖 ${p.libros?.titulo}</div>`).join('')}
-                <button id="btnConfirmarEntrega" class="success" style="margin-top:15px;">✅ Confirmar entrega y firma</button>
+                <button id="btnConfirmarEntregaAlumno" class="success" style="margin-top:15px;">✅ Confirmar entrega y firma</button>
             </div>
         `;
         
-        document.getElementById('btnConfirmarEntrega').onclick = async () => {
+        document.getElementById('btnConfirmarEntregaAlumno').onclick = async () => {
             await supabase
                 .from('historial_alumnos')
                 .update({ lote_entregado: true, fecha_entrega: new Date().toISOString().slice(0,10) })
