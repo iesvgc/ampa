@@ -2663,13 +2663,15 @@
             }
             
             let html = `<h3>📚 Préstamos activos (${prestamos.length})</h3>
-                <table style="width:100%; border-collapse:collapse;">
-                    <thead><tr><th>Libro</th><th>Alumno</th><th>Curso</th><th>Fecha préstamo</th></tr></thead>
+                <table class="data-table" style="width:100%; border-collapse:collapse;">
+                    <thead><tr style="background:#2563eb; color:white;">
+                        <th>Libro</th><th>Alumno</th><th>Curso</th><th>Grupo</th><th>Fecha préstamo</th>
+                    </tr></thead>
                     <tbody>`;
             for (const p of prestamos) {
-                html += `<tr><td>${p.libro}</td><td>${p.alumno}</td><td>${p.curso || '-'}</td><td>${p.fecha_prestamo}</td></tr>`;
+                html += `<tr><td>${p.libro}</td><td>${p.alumno}</td><td>${p.curso || '-'}</td><td>${p.grupo || '-'}</td><td>${p.fecha_prestamo}</td></tr>`;
             }
-            html += `</tbody></table>`;
+            html += `</tbody> licensierad`;
             resultadosDiv.innerHTML = html;
             return;
         }
@@ -2681,25 +2683,54 @@
             return;
         }
         
+        // Para cada alumno, obtener si tiene libros sin devolver
         let html = `<h3>Resultados: ${alumnos.length} alumnos</h3>
-            <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+            <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                 <thead><tr style="background:#2563eb; color:white;">
-                    <th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th><th>Beca</th><th>Socio</th><th>Donante</th>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Apellidos</th>
+                    <th>Curso</th>
+                    <th>Grupo</th>
+                    <th>Teléfono</th>
+                    <th>Bilingüe</th>
+                    <th>Diversificación</th>
+                    <th>Beca</th>
+                    <th>Socio AMPA</th>
+                    <th>Donante</th>
+                    <th>Observaciones</th>
+                    <th>Libros sin devolver</th>
                 </tr></thead>
                 <tbody>`;
         
         for (const a of alumnos) {
-            html += `<tr style="border-bottom:1px solid #ddd;">
+            // Contar libros prestados NO devueltos
+            const { count: librosSinDevolver } = await supabase
+                .from('prestamos')
+                .select('*', { count: 'exact', head: true })
+                .eq('alumno_id', a.alumnos.id)
+                .eq('entregado', false);
+            
+            html += `<tr>
+                <td>${a.alumnos.codigo_usuario || '-'}</td>
                 <td>${a.alumnos.nombre || ''}</td>
                 <td>${a.alumnos.apellidos || ''}</td>
                 <td>${a.curso || '-'}</td>
                 <td>${a.grupo || '-'}</td>
+                <td>${a.telefono || '-'}</td>
+                <td style="text-align:center">${a.bilingue ? '✅' : '❌'}</td>
+                <td style="text-align:center">${a.diversificacion ? '✅' : '❌'}</td>
                 <td style="text-align:center">${a.beca ? '✅' : '❌'}</td>
                 <td style="text-align:center">${a.socio_ampa ? '✅' : '❌'}</td>
                 <td style="text-align:center">${a.donante ? '✅' : '❌'}</td>
+                <td>${(a.observaciones || '').substring(0, 50)}${(a.observaciones || '').length > 50 ? '...' : ''}</td>
+                <td style="text-align:center; color:${librosSinDevolver > 0 ? '#dc2626' : '#10b981'}; font-weight:bold;">
+                    ${librosSinDevolver > 0 ? `${librosSinDevolver} pendiente${librosSinDevolver !== 1 ? 's' : ''}` : '✅ Todo devuelto'}
+                </td>
             </tr>`;
         }
-        html += `</tbody></table>`;
+        html += `</tbody></table></div>`;
         resultadosDiv.innerHTML = html;
     }
     
