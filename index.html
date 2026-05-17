@@ -220,7 +220,7 @@
             return;
         }
         
-        // Filtrar solo los que tienen libros (lote preparado o prestados)
+        // Filtrar solo los que tienen libros
         let alumnosConLibros = [];
         for (const h of alumnos) {
             const { data: prestamos } = await supabase
@@ -243,10 +243,11 @@
             return;
         }
         
-        // Generar HTML para todas las fichas
+        // Generar HTML para todas las fichas (cada ficha en su propia página)
         let todasFichas = '';
         
-        for (const item of alumnosConLibros) {
+        for (let i = 0; i < alumnosConLibros.length; i++) {
+            const item = alumnosConLibros[i];
             const alumno = item.alumno;
             const historial = item.historial;
             const prestamos = item.prestamos;
@@ -254,8 +255,11 @@
             
             const tituloSeccion = loteEntregado ? '📚 LIBROS PRESTADOS' : '📦 LOTE PREPARADO (pendiente de recoger)';
             
+            // Añadir clase para salto de página (excepto en la última)
+            const pageBreakClass = i < alumnosConLibros.length - 1 ? 'page-break' : '';
+            
             todasFichas += `
-                <div style="page-break-after: always; margin-bottom: 40px;">
+                <div class="ficha-page ${pageBreakClass}">
                     <div class="header">
                         <h1>📚 INSTITUTO VICTOR GARCÍA DE LA CONCHA</h1>
                         <p>Villaviciosa - Banco de Libros</p>
@@ -277,8 +281,8 @@
                         <div class="dato"><strong>Donante:</strong> ${historial.donante ? 'Sí' : 'No'}</div>
                     </div>
                     
-                    <h3>${tituloSeccion} (${prestamos.length})</h3>
-                    <table style="width:100%; border-collapse:collapse;">
+                    <h3>${tituloSeccion} (${prestamos.length} libros)</h3>
+                    <table>
                         <thead>
                             <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th><th>Signatura</th><th>Fecha préstamo</th></tr>
                         </thead>
@@ -337,6 +341,13 @@
                         padding: 40px;
                         background: white;
                         color: #1e293b;
+                    }
+                    .ficha-page {
+                        margin-bottom: 20px;
+                        padding-bottom: 20px;
+                    }
+                    .page-break {
+                        page-break-after: always;
                     }
                     .header {
                         text-align: center;
@@ -402,18 +413,23 @@
                         padding-top: 20px;
                     }
                     @media print {
-                        body { padding: 20px; }
-                        .page-break { page-break-after: always; }
+                        body { padding: 0; margin: 0; }
+                        .ficha-page { margin: 0; padding: 20px; }
                     }
                 </style>
             </head>
             <body>
                 ${todasFichas}
+                <script>
+                    window.onload = function() {
+                        window.print();
+                    };
+                </script>
             </body>
             </html>
         `);
         ventana.document.close();
-    }    
+    }
 
     
     async function buscarClaseParaEntrega() {
