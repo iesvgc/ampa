@@ -428,7 +428,10 @@
             curso: h.curso,
             grupo: h.grupo,
             beca: h.beca,
-            socio_ampa: h.socio_ampa
+            socio_ampa: h.socio_ampa,
+            telefono: h.telefono,
+            bilingue: h.bilingue,
+            diversificacion: h.diversificacion
         }));
         
         // Filtrar por código de usuario (SIEMPRE como string)
@@ -469,23 +472,44 @@
         
         // Mostrar resultados
         let html = `<h3>Resultados (${resultados.length})</h3>`;
+        
         for (const alumno of resultados) {
-            // Obtener libros prestados actualmente
-            const { data: prestamos } = await supabase
+            // Obtener libros prestados
+            const { data: prestamos } = await supabaseDebug
                 .from('prestamos')
                 .select('*, libros(*)')
                 .eq('alumno_id', alumno.id)
                 .eq('entregado', false);
             
-            const librosHtml = prestamos && prestamos.length > 0 
-                ? prestamos.map(p => `
-                    <div style="background:#fef3c7; padding:8px; margin:5px 0; border-radius:8px;">
-                        📖 <strong>${p.libros?.titulo || 'Sin título'}</strong><br>
-                        🔢 Código: ${p.libros?.codigo_barras || 'Sin código'}<br>
-                        📅 Préstamo: ${p.fecha_prestamo || '-'}
+            // Obtener estado de entrega del lote
+            const { data: historialEntrega } = await supabaseDebug
+                .from('historial_alumnos')
+                .select('lote_entregado')
+                .eq('alumno_id', alumno.id)
+                .eq('ano_academico_id', anoId)
+                .maybeSingle();
+            
+            const loteEntregado = historialEntrega?.lote_entregado || false;
+            const tieneLibros = prestamos && prestamos.length > 0;
+            
+            let librosHtml = '';
+            if (!loteEntregado && tieneLibros) {
+                librosHtml = `
+                    <div style="background:#fef3c7; padding:8px; margin-top:8px; border-radius:8px;">
+                        📦 <strong>LOTE PREPARADO (pendiente de recoger)</strong><br>
+                        ${prestamos.map(p => `📖 ${p.libros?.titulo}`).join('<br>')}
                     </div>
-                `).join('')
-                : '<p>No tiene libros prestados</p>';
+                `;
+            } else if (loteEntregado && tieneLibros) {
+                librosHtml = `
+                    <div style="background:#dcfce7; padding:8px; margin-top:8px; border-radius:8px;">
+                        📚 <strong>LIBROS PRESTADOS</strong><br>
+                        ${prestamos.map(p => `📖 ${p.libros?.titulo}`).join('<br>')}
+                    </div>
+                `;
+            } else {
+                librosHtml = '<div style="margin-top:8px;">No tiene libros prestados</div>';
+            }
             
             html += `
                 <div class="alumno-row" onclick="window.editarAlumno(${alumno.id})">
@@ -500,14 +524,10 @@
                         <span class="edit-icon" onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})">✏️</span>
                     </div>
                 </div>
-                <div style="background:#f1f5f9; padding:12px; margin-bottom:16px; border-radius:12px;">
-                    <strong>📚 Libros prestados:</strong>
-                    ${librosHtml}
-                </div>
+                ${librosHtml}
             `;
         }
         resultadosDiv.innerHTML = html;
-
     }
     
     window.editarAlumno = async (alumnoId) => {
