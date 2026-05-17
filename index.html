@@ -522,6 +522,11 @@
             historialActual = h;
         }
         
+        // Obtener datos del historial para saber si el lote está entregado
+        const { data: historial } = alumnoId ? await supabase.from('historial_alumnos').select('lote_entregado').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle() : { data: null };
+        const loteEntregado = historial?.lote_entregado || false;
+        
+        // Obtener préstamos (libres, no entregados aún)
         const { data: prestamos } = alumnoId ? await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false) : { data: [] };
         
         // Consultar libros donados por este alumno
@@ -567,8 +572,20 @@
             <div style="background:#fef3c7; padding:12px; border-radius:12px; margin:12px 0;">
                 <small>📌 Nota: Socio AMPA y Donante se editan desde las secciones "SOCIOS AMPA" y "BIBLIOTECA" respectivamente.</small>
             </div>
-            <h3>📚 Libros Prestados</h3>
-            <div id="prestamosLista">${prestamos?.map(p => `<div>📖 ${p.libros?.titulo} <button onclick="window.devolverLibroRapido(${p.id})">Devolver</button></div>`).join('') || '<p>Sin préstamos activos</p>'}</div>
+            ${!loteEntregado && prestamos?.length > 0 ? `
+                <h3>📦 LOTE PREPARADO (pendiente de recoger)</h3>
+                <div style="background:#fef3c7; padding:12px; border-radius:12px; margin-bottom:15px;">
+                    ${prestamos.map(p => `<div>📖 ${p.libros?.titulo}</div>`).join('')}
+                    <p style="margin-top:10px;"><small>⚠️ El alumno aún no ha recogido este lote. Debe confirmar la entrega en la sección "Entregar lote" de PRÉSTAMOS.</small></p>
+                </div>
+            ` : ''}
+            
+            ${loteEntregado && prestamos?.length > 0 ? `
+                <h3>📚 LIBROS PRESTADOS</h3>
+                <div id="prestamosLista">${prestamos.map(p => `<div>📖 ${p.libros?.titulo} <button onclick="window.devolverLibroRapido(${p.id})">Devolver</button></div>`).join('')}</div>
+            ` : ''}
+            
+            ${prestamos?.length === 0 ? '<p>No tiene libros prestados actualmente</p>' : ''}
             ${donacionesHtml}
             <div class="flex">
                 <button id="guardarAlumnoBtn">💾 Guardar</button>
