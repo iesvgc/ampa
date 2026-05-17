@@ -1692,7 +1692,7 @@
                 estado: estado,
                 origen: origen,
                 incidencia: null,
-                fecha_compra: anio ? `${anio}-01-01` : null,
+                fecha_compra: anio || null,  // Guarda solo el año como texto, no como fecha
                 signatura: signatura,
                 donante_id: origen === 'Donado' && donanteId ? parseInt(donanteId) : null
             };
