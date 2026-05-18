@@ -1410,12 +1410,35 @@
         };
     };
     
-    window.darBajaSocio = async (socioId, alumnoId) => {
+    window.darBajaSocio = async (alumnoId) => {
         if(!confirm('¿Dar de baja a este socio? Se conservará el historial.')) return;
-        await supabase.from('socios').update({ activo: false }).eq('id', socioId);
-        await supabase.from('historial_alumnos').update({ socio_ampa: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+        
+        // Obtener año activo
+        const { data: anoActivo } = await supabase.from('ano_academico').select('id').eq('activo', true).single();
+        const anoId = anoActivo.id;
+        
+        // Buscar el socio activo de este alumno
+        const { data: socio } = await supabase
+            .from('socios')
+            .select('id')
+            .eq('alumno_id', alumnoId)
+            .eq('ano_academico_id', anoId)
+            .eq('activo', true)
+            .maybeSingle();
+        
+        if (!socio) {
+            alert('No se encontró un socio activo para este alumno');
+            return;
+        }
+        
+        // Dar de baja el socio
+        await supabase.from('socios').update({ activo: false }).eq('id', socio.id);
+        
+        // Actualizar historial del alumno
+        await supabase.from('historial_alumnos').update({ socio_ampa: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', anoId);
+        
         alert('Socio dado de baja');
-        buscarSocios();
+        buscarSociosMejorado();
     };
     
     async function registrarPagoSocio() {
