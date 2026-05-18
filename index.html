@@ -858,6 +858,18 @@
         if(document.getElementById('editCurso')) document.getElementById('editCurso').value = historialActual?.curso || '1ESO';
         
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
+            // VALIDAR TELÉFONO (obligatorio, 9 dígitos)
+            const telefono = document.getElementById('editTelefono').value.trim();
+            if (!telefono) {
+                alert("El teléfono es obligatorio");
+                return;
+            }
+            if (!/^[0-9]{9}$/.test(telefono)) {
+                alert("El teléfono debe tener 9 dígitos numéricos (ej: 666123456)");
+                return;
+            }
+            
+
             let nuevoAlumnoId = alumnoId;
             
             if(!alumnoId) {
