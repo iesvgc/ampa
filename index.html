@@ -1370,11 +1370,20 @@
     }
     
     window.registrarPagoSocioDirecto = async (alumnoId) => {
+        if (!alumnoId) {
+            alert("ID de alumno no válido");
+            return;
+        }
+        
         const fecha = new Date().toISOString().slice(0,10);
         
-        const { error } = await supabaseDebug.from('socios').insert({
+        // Obtener año activo
+        const { data: anoActivo } = await supabase.from('ano_academico').select('id').eq('activo', true).single();
+        
+        // Insertar socio (el trigger asignará n_socio automáticamente)
+        const { error } = await supabase.from('socios').insert({
             alumno_id: alumnoId,
-            ano_academico_id: currentAnoId,
+            ano_academico_id: anoActivo.id,
             fecha_pago: fecha,
             pagado: true,
             activo: true
@@ -1385,7 +1394,8 @@
             return;
         }
         
-        await supabaseDebug.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+        // Actualizar historial del alumno
+        await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', anoActivo.id);
         
         alert('✅ Socio registrado correctamente');
         buscarSociosMejorado();
@@ -1411,18 +1421,22 @@
     };
     
     window.darBajaSocio = async (alumnoId) => {
+        if (!alumnoId) {
+            alert("ID de alumno no válido");
+            return;
+        }
+        
         if(!confirm('¿Dar de baja a este socio? Se conservará el historial.')) return;
         
         // Obtener año activo
         const { data: anoActivo } = await supabase.from('ano_academico').select('id').eq('activo', true).single();
-        const anoId = anoActivo.id;
         
-        // Buscar el socio activo de este alumno
+        // Buscar el socio activo
         const { data: socio } = await supabase
             .from('socios')
             .select('id')
             .eq('alumno_id', alumnoId)
-            .eq('ano_academico_id', anoId)
+            .eq('ano_academico_id', anoActivo.id)
             .eq('activo', true)
             .maybeSingle();
         
@@ -1431,11 +1445,9 @@
             return;
         }
         
-        // Dar de baja el socio
+        // Dar de baja
         await supabase.from('socios').update({ activo: false }).eq('id', socio.id);
-        
-        // Actualizar historial del alumno
-        await supabase.from('historial_alumnos').update({ socio_ampa: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', anoId);
+        await supabase.from('historial_alumnos').update({ socio_ampa: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', anoActivo.id);
         
         alert('Socio dado de baja');
         buscarSociosMejorado();
