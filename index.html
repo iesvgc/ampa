@@ -3035,8 +3035,9 @@
         for (const h of historiales) {
             const librosPrestados = prestamosCount[h.alumnos.id] || 0;
             
-            // SOLO alumnos que tienen libros prestados (devolución pendiente)
+            // SOLO alumnos que tienen libros prestados Y el lote ya fue entregado (prestados realmente)
             if (librosPrestados === 0) continue;
+            if (h.lote_entregado !== true) continue;  // ← CLAVE: solo los que ya recogieron el lote
             
             resultados.push({
                 id: h.alumnos.id,
@@ -3066,18 +3067,18 @@
         }
         
         if (resultados.length === 0) {
-            resultadosDiv.innerHTML = '<p>✅ No hay alumnos con libros pendientes de devolución</p>';
+            resultadosDiv.innerHTML = '<p>✅ No hay alumnos con libros prestados actualmente</p>';
             return;
         }
         
         // Mostrar resultados en tabla
-        let html = `<h3>Alumnos con libros pendientes de devolución (${resultados.length})</h3>
+        let html = `<h3>Alumnos con libros prestados (${resultados.length})</h3>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead><tr style="background:#2563eb; color:white;">
                         <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
                         <th>Beca</th><th>Socio</th><th>Libros pendientes</th><th></th>
-                    <tr></thead>
+                    </tr></thead>
                     <tbody>`;
         
         for (const a of resultados) {
