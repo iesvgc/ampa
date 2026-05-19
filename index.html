@@ -35,6 +35,14 @@
         .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
         .resultados { max-height: 500px; overflow-y: auto; }
         .tachado { text-decoration: line-through; opacity: 0.6; }
+        .tabla-resultados th, .tabla-resultados td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .tabla-resultados tr:hover {
+            background-color: #f1f5f9;
+        }        
     </style>
 </head>
 <body>
@@ -659,44 +667,75 @@
         }
         
         // Convertir a formato usable
-        let resultados = historiales.map(h => ({
-            id: h.alumnos.id,
-            nombre: h.alumnos.nombre,
-            apellidos: h.alumnos.apellidos,
-            codigo_usuario: h.alumnos.codigo_usuario,
-            curso: h.curso,
-            grupo: h.grupo,
-            beca: h.beca,
-            socio_ampa: h.socio_ampa,
-            telefono: h.telefono,
-            bilingue: h.bilingue,
-            diversificacion: h.diversificacion
-        }));
-        
-        // Filtrar por código de usuario (SIEMPRE como string)
-        if (codigoRaw) {
-            resultados = resultados.filter(a => {
-                const codigoAlumno = a.codigo_usuario ? String(a.codigo_usuario) : '';
-                return codigoAlumno.includes(codigoRaw);
+        let resultados = [];
+        for (const h of historiales) {
+            // Obtener libros prestados
+            const { data: prestamos } = await supabaseDebug
+                .from('prestamos')
+                .select('*, libros(*)')
+                .eq('alumno_id', h.alumnos.id)
+                .eq('entregado', false);
+            
+            // Obtener estado de entrega del lote
+            const { data: historialEntrega } = await supabaseDebug
+                .from('historial_alumnos')
+                .select('lote_entregado')
+                .eq('alumno_id', h.alumnos.id)
+                .eq('ano_academico_id', anoId)
+                .maybeSingle();
+            
+            const loteEntregado = historialEntrega?.lote_entregado || false;
+            const tieneLibros = prestamos && prestamos.length > 0;
+            
+            let estadoLibros = '';
+            if (!loteEntregado && tieneLibros) {
+                estadoLibros = '📦 LOTE PREPARADO';
+            } else if (loteEntregado && tieneLibros) {
+                estadoLibros = '📚 PRESTADOS';
+            } else {
+                estadoLibros = '❌ Sin libros';
+            }
+            
+            let librosLista = '';
+            if (tieneLibros) {
+                librosLista = prestamos.map(p => `${p.libros?.titulo || 'Sin título'}`).join(', ');
+            }
+            
+            resultados.push({
+                id: h.alumnos.id,
+                codigo: h.alumnos.codigo_usuario || '-',
+                nombre: h.alumnos.nombre || '',
+                apellidos: h.alumnos.apellidos || '',
+                curso: h.curso || '-',
+                grupo: h.grupo || '-',
+                telefono: h.telefono || '-',
+                beca: h.beca ? '✅' : '❌',
+                socio_ampa: h.socio_ampa ? '✅' : '❌',
+                bilingue: h.bilingue ? '✅' : '❌',
+                diversificacion: h.diversificacion ? '✅' : '❌',
+                donante: h.donante ? '✅' : '❌',
+                observaciones: (h.observaciones || '').substring(0, 50),
+                estadoLibros: estadoLibros,
+                librosLista: librosLista,
+                loteEntregado: loteEntregado,
+                prestamos: prestamos
             });
         }
         
-        // Filtrar por nombre
+        // Filtrar resultados
+        if (codigoRaw) {
+            resultados = resultados.filter(a => String(a.codigo).includes(codigoRaw));
+        }
         if (nombreBusq) {
-            resultados = resultados.filter(a => normalizarTexto(a.nombre || '').includes(nombreBusq));
+            resultados = resultados.filter(a => normalizarTexto(a.nombre).includes(nombreBusq));
         }
-        
-        // Filtrar por apellidos
         if (apellidosBusq) {
-            resultados = resultados.filter(a => normalizarTexto(a.apellidos || '').includes(apellidosBusq));
+            resultados = resultados.filter(a => normalizarTexto(a.apellidos).includes(apellidosBusq));
         }
-        
-        // Filtrar por curso
         if (cursoFiltro) {
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
-        // Mostrar resultados o mensaje
         if (resultados.length === 0) {
             resultadosDiv.innerHTML = `
                 <p>No se encontraron alumnos</p>
@@ -709,63 +748,55 @@
             return;
         }
         
-        // Mostrar resultados
-        let html = `<h3>Resultados (${resultados.length})</h3>`;
+        // Mostrar resultados en tabla Excel
+        let html = `
+            <div style="overflow-x: auto;">
+                <table class="tabla-resultados" style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+                    <thead>
+                        <tr style="background:#2563eb; color:white; position:sticky; top:0;">
+                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
+                            <th>Teléfono</th><th>Beca</th><th>Socio</th><th>Bilingüe</th><th>Diversif.</th>
+                            <th>Donante</th><th>Estado libros</th><th>Libros</th><th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
         
         for (const alumno of resultados) {
-            // Obtener libros prestados
-            const { data: prestamos } = await supabaseDebug
-                .from('prestamos')
-                .select('*, libros(*)')
-                .eq('alumno_id', alumno.id)
-                .eq('entregado', false);
-            
-            // Obtener estado de entrega del lote
-            const { data: historialEntrega } = await supabaseDebug
-                .from('historial_alumnos')
-                .select('lote_entregado')
-                .eq('alumno_id', alumno.id)
-                .eq('ano_academico_id', anoId)
-                .maybeSingle();
-            
-            const loteEntregado = historialEntrega?.lote_entregado || false;
-            const tieneLibros = prestamos && prestamos.length > 0;
-            
-            let librosHtml = '';
-            if (!loteEntregado && tieneLibros) {
-                librosHtml = `
-                    <div style="background:#fef3c7; padding:8px; margin-top:8px; border-radius:8px;">
-                        📦 <strong>LOTE PREPARADO (pendiente de recoger)</strong><br>
-                        ${prestamos.map(p => `📖 ${p.libros?.titulo}`).join('<br>')}
-                    </div>
-                `;
-            } else if (loteEntregado && tieneLibros) {
-                librosHtml = `
-                    <div style="background:#dcfce7; padding:8px; margin-top:8px; border-radius:8px;">
-                        📚 <strong>LIBROS PRESTADOS</strong><br>
-                        ${prestamos.map(p => `📖 ${p.libros?.titulo}`).join('<br>')}
-                    </div>
-                `;
-            } else {
-                librosHtml = '<div style="margin-top:8px;">No tiene libros prestados</div>';
-            }
-            
             html += `
-                <div class="alumno-row" onclick="window.editarAlumno(${alumno.id})">
-                    <div class="alumno-info">
-                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
-                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso || '-'} ${alumno.grupo || ''}<br>
-                        📞 Teléfono: ${alumno.telefono || '-'}<br>
-                        🎓 Beca: ${alumno.beca ? 'Sí' : 'No'} | 💰 Socio AMPA: ${alumno.socio_ampa ? 'Sí' : 'No'}<br>
-                        🌍 Bilingüe: ${alumno.bilingue ? 'Sí' : 'No'} | 📚 Diversificación: ${alumno.diversificacion ? 'Sí' : 'No'}
-                    </div>
-                    <div class="alumno-actions">
-                        <span class="edit-icon" onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})">✏️</span>
-                    </div>
-                </div>
-                ${librosHtml}
+                <tr style="border-bottom:1px solid #ddd; cursor:pointer;" onclick="window.editarAlumno(${alumno.id})">
+                    <td>${alumno.codigo}</td>
+                    <td>${alumno.nombre}</td>
+                    <td>${alumno.apellidos}</td>
+                    <td>${alumno.curso}</td>
+                    <td>${alumno.grupo}</td>
+                    <td>${alumno.telefono}</td>
+                    <td style="text-align:center">${alumno.beca}</td>
+                    <td style="text-align:center">${alumno.socio_ampa}</td>
+                    <td style="text-align:center">${alumno.bilingue}</td>
+                    <td style="text-align:center">${alumno.diversificacion}</td>
+                    <td style="text-align:center">${alumno.donante}</td>
+                    <td style="text-align:center; font-weight:bold; ${alumno.estadoLibros.includes('PREPARADO') ? 'color:#dc2626;' : (alumno.estadoLibros.includes('PRESTADOS') ? 'color:#10b981;' : 'color:#64748b;')}">
+                        ${alumno.estadoLibros}
+                    </td>
+                    <td style="max-width:200px; white-space:nowrap; overflow-x:auto;">${alumno.librosLista || '-'}</td>
+                    <td style="white-space:nowrap;">
+                        <button onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})" style="padding:4px 8px; font-size:0.7rem;">✏️ Editar</button>
+                        <button onclick="event.stopPropagation(); window.imprimirFichaAlumno(${alumno.id})" style="padding:4px 8px; font-size:0.7rem;">🖨️ Imprimir</button>
+                    </td>
+                </tr>
             `;
         }
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top:15px;">
+                <button onclick="window.editarAlumno(null)" class="success">➕ Nuevo Alumno</button>
+            </div>
+        `;
+        
         resultadosDiv.innerHTML = html;
     }
     
@@ -1380,7 +1411,15 @@
         }
         resultadosDiv.innerHTML = html;
     }
-    
+    window.imprimirFichaAlumno = async (alumnoId) => {
+        // Redirige a la edición y simula clic en imprimir
+        window.editarAlumno(alumnoId);
+        // Esperamos a que cargue la ficha y luego disparamos la impresión
+        setTimeout(() => {
+            const btnImprimir = document.getElementById('imprimirAlumnoBtn');
+            if (btnImprimir) btnImprimir.click();
+        }, 500);
+    };    
     window.registrarPagoSocioDirecto = async (alumnoId) => {
         if (!alumnoId) {
             alert("ID de alumno no válido");
