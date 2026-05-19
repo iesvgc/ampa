@@ -566,25 +566,37 @@
         const { data: anoActivo } = await supabaseDebug.from('ano_academico').select('id').eq('activo', true).single();
         const anoId = anoActivo.id;
         
-        const { data: historiales, error } = await supabaseDebug
+        // 1. Obtener historial de alumnos
+        let query = supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
             .eq('ano_academico_id', anoId);
+        
+        const { data: historiales, error } = await query;
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
             return;
         }
         
+        // 2. Obtener TODOS los préstamos activos de una vez
+        const { data: todosPrestamos } = await supabaseDebug
+            .from('prestamos')
+            .select('alumno_id, id')
+            .eq('entregado', false)
+            .eq('ano_academico_id', anoId);
+        
+        // Crear mapa de conteo de préstamos por alumno
+        const prestamosCount = {};
+        for (const p of todosPrestamos || []) {
+            prestamosCount[p.alumno_id] = (prestamosCount[p.alumno_id] || 0) + 1;
+        }
+        
         let resultados = [];
         for (const h of historiales) {
-            const { count: librosPrestados } = await supabase
-                .from('prestamos')
-                .select('*', { count: 'exact', head: true })
-                .eq('alumno_id', h.alumnos.id)
-                .eq('entregado', false);
-            
+            const librosPrestados = prestamosCount[h.alumnos.id] || 0;
             const yaEntregado = h.lote_entregado || false;
+            
             let estado = '';
             let colorEstado = '';
             
@@ -608,10 +620,10 @@
                 grupo: h.grupo,
                 beca: h.beca,
                 socio_ampa: h.socio_ampa,
-                estado: estado,
-                colorEstado: colorEstado,
+                librosPrestados: librosPrestados,
                 yaEntregado: yaEntregado,
-                librosPrestados: librosPrestados
+                estado: estado,
+                colorEstado: colorEstado
             });
         }
         
@@ -634,12 +646,16 @@
             return;
         }
         
+        mostrarTablaResultadosEntrega(resultados, resultadosDiv);
+    }
+    
+    function mostrarTablaResultadosEntrega(resultados, resultadosDiv) {
         let html = `<h3>Resultados (${resultados.length})</h3>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead><tr style="background:#2563eb; color:white;">
                         <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                        <th>Beca</th><th>Socio</th><th>Estado</th><th>Acción</th>
+                        <th>Beca</th><th>Socio</th><th>Libros</th><th>Estado</th><th>Acción</th>
                     </tr></thead>
                     <tbody>`;
         
@@ -653,6 +669,7 @@
                     <td style="padding:6px;">${a.grupo || ''}</td>
                     <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
                     <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${a.librosPrestados}</td>
                     <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
                     <td style="padding:6px;">
                         ${!a.yaEntregado && a.librosPrestados > 0 ? `<button onclick="confirmarEntregaDirecta(${a.id}, '${a.nombre}')" style="background:#10b981;">✅ Entregar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}
@@ -747,39 +764,47 @@
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        let query = supabase
+        const { data: anoActivo } = await supabaseDebug.from('ano_academico').select('id').eq('activo', true).single();
+        const anoId = anoActivo.id;
+        
+        // 1. Obtener historial de alumnos de la clase
+        let query = supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
-            .eq('ano_academico_id', currentAnoId)
+            .eq('ano_academico_id', anoId)
             .eq('curso', curso);
         
         if (grupo) query = query.eq('grupo', grupo);
         
-        const { data: alumnos } = await query;
+        const { data: historiales, error } = await query;
         
-        if (!alumnos || alumnos.length === 0) {
+        if (error) {
+            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            return;
+        }
+        
+        if (!historiales || historiales.length === 0) {
             resultadosDiv.innerHTML = '<p>No hay alumnos en esta clase</p>';
             return;
         }
         
-        let html = `<h3>Clase: ${curso} ${grupo} (${alumnos.length} alumnos)</h3>
-            <div style="overflow-x:auto;">
-                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
-                    <thead><tr style="background:#2563eb; color:white;">
-                        <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                        <th>Beca</th><th>Socio</th><th>Estado</th><th>Acción</th>
-                    </tr></thead>
-                    <tbody>`;
+        // 2. Obtener TODOS los préstamos activos de una vez
+        const { data: todosPrestamos } = await supabaseDebug
+            .from('prestamos')
+            .select('alumno_id, id')
+            .eq('entregado', false)
+            .eq('ano_academico_id', anoId);
         
-        for (const h of alumnos) {
-            const alumno = h.alumnos;
-            const { count: librosPrestados } = await supabase
-                .from('prestamos')
-                .select('*', { count: 'exact', head: true })
-                .eq('alumno_id', alumno.id)
-                .eq('entregado', false);
-            
+        const prestamosCount = {};
+        for (const p of todosPrestamos || []) {
+            prestamosCount[p.alumno_id] = (prestamosCount[p.alumno_id] || 0) + 1;
+        }
+        
+        let resultados = [];
+        for (const h of historiales) {
+            const librosPrestados = prestamosCount[h.alumnos.id] || 0;
             const yaEntregado = h.lote_entregado || false;
+            
             let estado = '';
             let colorEstado = '';
             
@@ -794,23 +819,28 @@
                 colorEstado = '#64748b';
             }
             
-            html += `
-                <tr style="border-bottom:1px solid #ddd;">
-                    <td style="padding:6px;">${alumno.codigo_usuario || '-'}</td>
-                    <td style="padding:6px;">${alumno.nombre} ${alumno.apellidos || ''}</td>
-                    <td style="padding:6px;">${h.curso}</td>
-                    <td style="padding:6px;">${h.grupo || ''}</td>
-                    <td style="padding:6px; text-align:center;">${h.beca ? '✅' : '❌'}</td>
-                    <td style="padding:6px; text-align:center;">${h.socio_ampa ? '✅' : '❌'}</td>
-                    <td style="padding:6px; font-weight:bold; color:${colorEstado};">${estado}</td>
-                    <td style="padding:6px;">
-                        ${!yaEntregado && librosPrestados > 0 ? `<button onclick="confirmarEntregaDirecta(${alumno.id}, '${alumno.nombre}')" style="background:#10b981;">✅ Entregar lote</button>` : (yaEntregado ? '✅ Ya entregado' : '-')}
-                    </td>
-                </tr>
-            `;
+            resultados.push({
+                id: h.alumnos.id,
+                nombre: h.alumnos.nombre,
+                apellidos: h.alumnos.apellidos,
+                codigo_usuario: h.alumnos.codigo_usuario,
+                curso: h.curso,
+                grupo: h.grupo,
+                beca: h.beca,
+                socio_ampa: h.socio_ampa,
+                librosPrestados: librosPrestados,
+                yaEntregado: yaEntregado,
+                estado: estado,
+                colorEstado: colorEstado
+            });
         }
-        html += `</tbody></table></div>`;
-        resultadosDiv.innerHTML = html;
+        
+        if (resultados.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron alumnos</p>';
+            return;
+        }
+        
+        mostrarTablaResultadosEntrega(resultados, resultadosDiv);
     }
     
     window.confirmarEntregaClaseIndividual = async (alumnoId, nombre) => {
