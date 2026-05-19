@@ -1169,7 +1169,33 @@
         } else {
             donacionesHtml += '<p>No ha donado libros</p>';
         }
+        // Consultar historial de préstamos DEVUELTOS (entregados = true)
+        const { data: prestamosHistoricos } = await supabase
+            .from('prestamos')
+            .select('*, libros(*)')
+            .eq('alumno_id', alumnoId)
+            .eq('entregado', true)
+            .order('fecha_devolucion', { ascending: false });
         
+        let historialHtml = '<h3>📜 HISTORIAL DE PRÉSTAMOS DEVUELTOS</h3>';
+        if (prestamosHistoricos && prestamosHistoricos.length > 0) {
+            historialHtml += '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:0.75rem;">';
+            historialHtml += '<thead><tr style="background:#64748b; color:white;"><th>Título</th><th>Materia</th><th>Curso</th><th>Fecha préstamo</th><th>Fecha devolución</th></tr></thead><tbody>';
+            for (const p of prestamosHistoricos) {
+                historialHtml += `
+                    <tr style="border-bottom:1px solid #ddd;">
+                        <td style="padding:6px;">${p.libros?.titulo || '-'}</td>
+                        <td style="padding:6px;">${p.libros?.materia || '-'}</td>
+                        <td style="padding:6px;">${p.libros?.curso_para || '-'}</td>
+                        <td style="padding:6px;">${p.fecha_prestamo || '-'}</td>
+                        <td style="padding:6px;">${p.fecha_devolucion || '-'}</td>
+                    </tr>
+                `;
+            }
+            historialHtml += '</tbody></table></div>';
+        } else {
+            historialHtml += '<p>No hay historial de préstamos devueltos</p>';
+        }        
         let html = `<div class="card">
             <h2>${alumnoId ? '✏️ Editando: ' + (alumno?.nombre || '') : '➕ Nuevo Alumno'}</h2>
             <div class="form-grid">
@@ -1191,6 +1217,7 @@
             </div>
             <div id="librosSeccion"></div>
             ${donacionesHtml}
+            ${historialHtml}
             <div class="flex">
                 <button id="guardarAlumnoBtn">💾 Guardar</button>
                 ${alumnoId ? '<button id="imprimirAlumnoBtn" class="secondary">🖨️ Imprimir ficha</button>' : ''}
