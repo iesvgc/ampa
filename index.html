@@ -1243,6 +1243,20 @@
         // Usar socio_ampa directamente del historial (sin consultar tabla socios)
         for (const alumno of resultados) {
             alumno.esSocio = alumno.socio_ampa === true;
+            
+            // Obtener el número de socio solo si es socio
+            if (alumno.esSocio) {
+                const { data: socio } = await supabaseDebug
+                    .from('socios')
+                    .select('n_socio')
+                    .eq('alumno_id', alumno.id)
+                    .eq('ano_academico_id', anoId)
+                    .eq('activo', true)
+                    .maybeSingle();
+                alumno.n_socio = socio?.n_socio || null;
+            } else {
+                alumno.n_socio = null;
+            }
         }
         
         // Filtrar por estado socio (solo si está seleccionado "socio")
@@ -1264,6 +1278,7 @@
                         <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                         📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
                         ${alumno.esSocio ? '✅ Socio AMPA' : '❌ No es socio'}
+                        ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio}` : ''}
                     </div>
                     <div class="alumno-actions">
                         ${!alumno.esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
