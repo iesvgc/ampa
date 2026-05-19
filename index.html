@@ -625,16 +625,11 @@
     }
     async function buscarAlumnosMejorado() {
         // Obtener el año activo
-        const { data: anoActivo, error: anoError } = await supabaseDebug
+        const { data: anoActivo } = await supabaseDebug
             .from('ano_academico')
             .select('id')
             .eq('activo', true)
             .single();
-        
-        if (anoError) {
-            console.error("Error obteniendo año activo:", anoError);
-            return;
-        }
         
         const anoId = anoActivo.id;
         
@@ -650,11 +645,13 @@
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        // Consultar historial del año activo
-        const { data: historiales, error } = await supabaseDebug
+        // 1. Obtener historial de alumnos
+        let query = supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
             .eq('ano_academico_id', anoId);
+        
+        const { data: historiales, error } = await query;
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
@@ -666,26 +663,38 @@
             return;
         }
         
-        // Convertir a formato usable
+        // 2. Obtener TODOS los préstamos activos del año (una sola consulta)
+        const { data: todosPrestamos } = await supabaseDebug
+            .from('prestamos')
+            .select('*, libros(*)')
+            .eq('entregado', false)
+            .eq('ano_academico_id', anoId);
+        
+        // 3. Obtener TODOS los estados de entrega (una sola consulta)
+        const { data: todosEntregas } = await supabaseDebug
+            .from('historial_alumnos')
+            .select('alumno_id, lote_entregado')
+            .eq('ano_academico_id', anoId);
+        
+        // Crear mapas para acceso rápido
+        const prestamosPorAlumno = {};
+        for (const p of todosPrestamos || []) {
+            if (!prestamosPorAlumno[p.alumno_id]) prestamosPorAlumno[p.alumno_id] = [];
+            prestamosPorAlumno[p.alumno_id].push(p);
+        }
+        
+        const entregaPorAlumno = {};
+        for (const e of todosEntregas || []) {
+            entregaPorAlumno[e.alumno_id] = e.lote_entregado || false;
+        }
+        
+        // 4. Construir resultados
         let resultados = [];
         for (const h of historiales) {
-            // Obtener libros prestados
-            const { data: prestamos } = await supabaseDebug
-                .from('prestamos')
-                .select('*, libros(*)')
-                .eq('alumno_id', h.alumnos.id)
-                .eq('entregado', false);
-            
-            // Obtener estado de entrega del lote
-            const { data: historialEntrega } = await supabaseDebug
-                .from('historial_alumnos')
-                .select('lote_entregado')
-                .eq('alumno_id', h.alumnos.id)
-                .eq('ano_academico_id', anoId)
-                .maybeSingle();
-            
-            const loteEntregado = historialEntrega?.lote_entregado || false;
-            const tieneLibros = prestamos && prestamos.length > 0;
+            const alumnoId = h.alumnos.id;
+            const prestamos = prestamosPorAlumno[alumnoId] || [];
+            const loteEntregado = entregaPorAlumno[alumnoId] || false;
+            const tieneLibros = prestamos.length > 0;
             
             let estadoLibros = '';
             if (!loteEntregado && tieneLibros) {
@@ -698,11 +707,12 @@
             
             let librosLista = '';
             if (tieneLibros) {
-                librosLista = prestamos.map(p => `${p.libros?.titulo || 'Sin título'}`).join(', ');
+                librosLista = prestamos.map(p => p.libros?.titulo || 'Sin título').join(', ');
+                if (librosLista.length > 50) librosLista = librosLista.substring(0, 50) + '…';
             }
             
             resultados.push({
-                id: h.alumnos.id,
+                id: alumnoId,
                 codigo: h.alumnos.codigo_usuario || '-',
                 nombre: h.alumnos.nombre || '',
                 apellidos: h.alumnos.apellidos || '',
@@ -716,9 +726,7 @@
                 donante: h.donante ? '✅' : '❌',
                 observaciones: (h.observaciones || '').substring(0, 50),
                 estadoLibros: estadoLibros,
-                librosLista: librosLista,
-                loteEntregado: loteEntregado,
-                prestamos: prestamos
+                librosLista: librosLista
             });
         }
         
@@ -748,41 +756,38 @@
             return;
         }
         
-        // Mostrar resultados en tabla Excel
+        // Mostrar resultados en tabla
         let html = `
             <div style="overflow-x: auto;">
-                <table class="tabla-resultados" style="width:100%; border-collapse:collapse; font-size:0.8rem;">
-                    <thead>
-                        <tr style="background:#2563eb; color:white; position:sticky; top:0;">
-                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                            <th>Teléfono</th><th>Beca</th><th>Socio</th><th>Bilingüe</th><th>Diversif.</th>
-                            <th>Donante</th><th>Estado libros</th><th>Libros</th><th>Acciones</th>
-                        </tr>
-                    </thead>
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                    <thead><tr style="background:#2563eb; color:white; position:sticky; top:0;">
+                        <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
+                        <th>Teléfono</th><th>Beca</th><th>Socio</th><th>Bilingüe</th><th>Diversif.</th>
+                        <th>Donante</th><th>Estado</th><th>Libros</th><th>Acciones</th>
+                    </tr></thead>
                     <tbody>
         `;
         
-        for (const alumno of resultados) {
+        for (const a of resultados) {
+            const colorEstado = a.estadoLibros.includes('PREPARADO') ? '#dc2626' : (a.estadoLibros.includes('PRESTADOS') ? '#10b981' : '#64748b');
             html += `
-                <tr style="border-bottom:1px solid #ddd; cursor:pointer;" onclick="window.editarAlumno(${alumno.id})">
-                    <td>${alumno.codigo}</td>
-                    <td>${alumno.nombre}</td>
-                    <td>${alumno.apellidos}</td>
-                    <td>${alumno.curso}</td>
-                    <td>${alumno.grupo}</td>
-                    <td>${alumno.telefono}</td>
-                    <td style="text-align:center">${alumno.beca}</td>
-                    <td style="text-align:center">${alumno.socio_ampa}</td>
-                    <td style="text-align:center">${alumno.bilingue}</td>
-                    <td style="text-align:center">${alumno.diversificacion}</td>
-                    <td style="text-align:center">${alumno.donante}</td>
-                    <td style="text-align:center; font-weight:bold; ${alumno.estadoLibros.includes('PREPARADO') ? 'color:#dc2626;' : (alumno.estadoLibros.includes('PRESTADOS') ? 'color:#10b981;' : 'color:#64748b;')}">
-                        ${alumno.estadoLibros}
-                    </td>
-                    <td style="max-width:200px; white-space:nowrap; overflow-x:auto;">${alumno.librosLista || '-'}</td>
-                    <td style="white-space:nowrap;">
-                        <button onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})" style="padding:4px 8px; font-size:0.7rem;">✏️ Editar</button>
-                        <button onclick="event.stopPropagation(); window.imprimirFichaAlumno(${alumno.id})" style="padding:4px 8px; font-size:0.7rem;">🖨️ Imprimir</button>
+                <tr style="border-bottom:1px solid #ddd; cursor:pointer;" onclick="window.editarAlumno(${a.id})">
+                    <td style="padding:6px;">${a.codigo}</td>
+                    <td style="padding:6px;">${a.nombre}</td>
+                    <td style="padding:6px;">${a.apellidos}</td>
+                    <td style="padding:6px;">${a.curso}</td>
+                    <td style="padding:6px;">${a.grupo}</td>
+                    <td style="padding:6px;">${a.telefono}</td>
+                    <td style="padding:6px; text-align:center;">${a.beca}</td>
+                    <td style="padding:6px; text-align:center;">${a.socio_ampa}</td>
+                    <td style="padding:6px; text-align:center;">${a.bilingue}</td>
+                    <td style="padding:6px; text-align:center;">${a.diversificacion}</td>
+                    <td style="padding:6px; text-align:center;">${a.donante}</td>
+                    <td style="padding:6px; text-align:center; font-weight:bold; color:${colorEstado};">${a.estadoLibros}</td>
+                    <td style="padding:6px; max-width:150px; white-space:nowrap; overflow-x:auto;">${a.librosLista || '-'}</td>
+                    <td style="padding:6px; white-space:nowrap;">
+                        <button onclick="event.stopPropagation(); window.editarAlumno(${a.id})" style="padding:2px 6px; font-size:0.7rem;">✏️</button>
+                        <button onclick="event.stopPropagation(); window.imprimirFichaAlumno(${a.id})" style="padding:2px 6px; font-size:0.7rem;">🖨️</button>
                     </td>
                 </tr>
             `;
@@ -792,8 +797,8 @@
                     </tbody>
                 </table>
             </div>
-            <div style="margin-top:15px;">
-                <button onclick="window.editarAlumno(null)" class="success">➕ Nuevo Alumno</button>
+            <div style="margin-top:10px;">
+                <button onclick="window.editarAlumno(null)" class="success" style="font-size:0.8rem;">➕ Nuevo Alumno</button>
             </div>
         `;
         
