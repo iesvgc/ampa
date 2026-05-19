@@ -2468,17 +2468,50 @@
             return;
         }
         
-        let resultados = historiales.map(h => ({
-            id: h.alumnos.id,
-            nombre: h.alumnos.nombre,
-            apellidos: h.alumnos.apellidos,
-            codigo_usuario: h.alumnos.codigo_usuario,
-            curso: h.curso,
-            grupo: h.grupo,
-            beca: h.beca,
-            socio_ampa: h.socio_ampa
-        }));
+        let resultados = [];
+        for (const h of historiales) {
+            // Obtener préstamos activos (no devueltos)
+            const { data: prestamos } = await supabase
+                .from('prestamos')
+                .select('*, libros(*)')
+                .eq('alumno_id', h.alumnos.id)
+                .eq('entregado', false);
+            
+            const tieneLibros = prestamos && prestamos.length > 0;
+            const loteEntregado = h.lote_entregado || false;
+            
+            let estado = '';
+            let colorEstado = '';
+            
+            if (tieneLibros && !loteEntregado) {
+                estado = '📦 LOTE PREPARADO (pendiente recoger)';
+                colorEstado = '#f59e0b';
+            } else if (tieneLibros && loteEntregado) {
+                estado = '📚 LIBROS PRESTADOS';
+                colorEstado = '#10b981';
+            } else {
+                estado = '❌ Sin libros asignados';
+                colorEstado = '#64748b';
+            }
+            
+            resultados.push({
+                id: h.alumnos.id,
+                nombre: h.alumnos.nombre,
+                apellidos: h.alumnos.apellidos,
+                codigo_usuario: h.alumnos.codigo_usuario,
+                curso: h.curso,
+                grupo: h.grupo,
+                beca: h.beca,
+                socio_ampa: h.socio_ampa,
+                estado: estado,
+                colorEstado: colorEstado,
+                tieneLibros: tieneLibros,
+                loteEntregado: loteEntregado,
+                libros: prestamos || []
+            });
+        }
         
+        // Filtrar
         if (codigoRaw) {
             resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
         }
@@ -2502,8 +2535,8 @@
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead><tr style="background:#2563eb; color:white;">
                         <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                        <th>Beca</th><th>Socio</th><th></th>
-                    </tr></thead>
+                        <th>Beca</th><th>Socio</th><th>Estado</th><th></th>
+                    <tr></thead>
                     <tbody>`;
         
         for (const a of resultados) {
@@ -2516,7 +2549,8 @@
                     <td style="padding:6px;">${a.grupo || ''}</td>
                     <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
                     <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
-                    <td style="padding:6px;"><button onclick="seleccionarAlumnoPreparar(${a.id})">Seleccionar</button></td>
+                    <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
+                    <td style="padding:6px;"><button onclick="seleccionarAlumnoPrepararConEstado(${a.id})">Seleccionar</button></td>
                 </tr>
             `;
         }
@@ -2524,36 +2558,67 @@
         resultadosDiv.innerHTML = html;
     }
     
-    window.seleccionarAlumnoPreparar = (alumnoId) => {
-        // Buscar el alumno seleccionado para mostrar sus datos
-        (async () => {
-            const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
-            const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
-            
-            alumnoSeleccionadoPreparar = alumno;
-            
-            document.getElementById('prepararResultados').innerHTML = `
-                <div class="alumno-row" style="border-left-color:#10b981;">
-                    <div class="alumno-info">
-                        <strong>✅ Alumno seleccionado: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
-                        📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
-                        ${historial?.beca ? '🎓 Becado | ' : ''}${historial?.socio_ampa ? '💰 Socio AMPA' : ''}
-                    </div>
+    window.seleccionarAlumnoPrepararConEstado = async (alumnoId) => {
+        const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
+        const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
+        
+        // Obtener libros prestados actualmente
+        const { data: prestamos } = await supabase
+            .from('prestamos')
+            .select('*, libros(*)')
+            .eq('alumno_id', alumnoId)
+            .eq('entregado', false);
+        
+        const tieneLibros = prestamos && prestamos.length > 0;
+        const loteEntregado = historial?.lote_entregado || false;
+        
+        let estadoDetalle = '';
+        let estadoColor = '';
+        
+        if (tieneLibros && !loteEntregado) {
+            estadoDetalle = '📦 LOTE PREPARADO (pendiente de recoger)';
+            estadoColor = '#f59e0b';
+        } else if (tieneLibros && loteEntregado) {
+            estadoDetalle = '📚 LIBROS PRESTADOS';
+            estadoColor = '#10b981';
+        } else {
+            estadoDetalle = '❌ Sin libros asignados';
+            estadoColor = '#64748b';
+        }
+        
+        let librosHtml = '';
+        if (tieneLibros) {
+            librosHtml = `<div style="margin-top:10px; background:#f8fafc; padding:10px; border-radius:8px;">
+                <strong>📚 Libros actuales:</strong><br>
+                ${prestamos.map(p => `📖 ${p.libros?.titulo} (${p.libros?.materia || '-'})`).join('<br>')}
+            </div>`;
+        }
+        
+        alumnoSeleccionadoPreparar = alumno;
+        
+        document.getElementById('prepararResultados').innerHTML = `
+            <div class="alumno-row" style="border-left-color:#10b981;">
+                <div class="alumno-info">
+                    <strong>✅ Alumno seleccionado: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                    📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
+                    ${historial?.beca ? '🎓 Becado | ' : ''}${historial?.socio_ampa ? '💰 Socio AMPA' : ''}<br>
+                    <strong style="color:${estadoColor};">${estadoDetalle}</strong>
+                    ${librosHtml}
                 </div>
-            `;
-            
-            document.getElementById('prepararLoteInfo').style.display = 'block';
-            document.getElementById('btnPrepararEscanear').disabled = false;
-            document.getElementById('btnPrepararGuardar').disabled = false;
-            
-            actualizarListaPrepararLote();
-            
-            document.getElementById('btnPrepararEscanear').onclick = () => {
-                modoActual = "prestar_libro_lote_preparar";
-                abrirScanner();
-            };
-            document.getElementById('btnPrepararGuardar').onclick = guardarPrestamoPreparar;
-        })();
+            </div>
+        `;
+        
+        document.getElementById('prepararLoteInfo').style.display = 'block';
+        document.getElementById('btnPrepararEscanear').disabled = false;
+        document.getElementById('btnPrepararGuardar').disabled = false;
+        
+        actualizarListaPrepararLote();
+        
+        document.getElementById('btnPrepararEscanear').onclick = () => {
+            modoActual = "prestar_libro_lote_preparar";
+            abrirScanner();
+        };
+        document.getElementById('btnPrepararGuardar').onclick = guardarPrestamoPreparar;
     };
     
     function actualizarListaPrepararLote() {
