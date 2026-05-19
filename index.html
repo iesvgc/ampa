@@ -1513,26 +1513,59 @@
             return;
         }
         
-        let html = `<h3>Resultados (${resultados.length})</h3>`;
+        let html = `<h3>Resultados (${resultados.length})</h3>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                    <thead><tr style="background:#2563eb; color:white;">
+                        <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
+                        <th>Beca</th><th>Socio</th><th>Libros</th><th>Acción</th>
+                    </tr></thead>
+                    <tbody>`;
         
-        for (const alumno of resultados) {
+        for (const a of resultados) {
+            // Obtener número de libros prestados para este alumno
+            const { count: librosPrestados } = await supabase
+                .from('prestamos')
+                .select('*', { count: 'exact', head: true })
+                .eq('alumno_id', a.id)
+                .eq('entregado', false);
+            
+            const yaEntregado = a.lote_entregado || false;
+            const estadoEntrega = yaEntregado ? '✅ Entregado' : (librosPrestados > 0 ? '⏳ Pendiente' : 'Sin libros');
+            
             html += `
-                <div class="alumno-row">
-                    <div class="alumno-info">
-                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
-                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
-                        ${alumno.esSocio ? '✅ Socio AMPA' : '❌ No es socio'}
-                        ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio}` : ''}
-                    </div>
-                    <div class="alumno-actions">
-                        ${!alumno.esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
-                        ${alumno.esSocio ? `<button class="danger" onclick="window.darBajaSocio(${alumno.id})">🗑️ Dar baja socio</button>` : ''}
-                    </div>
-                </div>
+                <tr style="border-bottom:1px solid #ddd;">
+                    <td style="padding:6px;">${a.codigo_usuario || '-'}</td>
+                    <td style="padding:6px;">${a.nombre}</td>
+                    <td style="padding:6px;">${a.apellidos || ''}</td>
+                    <td style="padding:6px;">${a.curso}</td>
+                    <td style="padding:6px;">${a.grupo || ''}</td>
+                    <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${librosPrestados}</td>
+                    <td style="padding:6px;">
+                        ${!yaEntregado && librosPrestados > 0 ? `<button onclick="confirmarEntregaDirecta(${a.id}, '${a.nombre}')" style="background:#10b981;">✅ Entregar lote</button>` : (yaEntregado ? '✅ Ya entregado' : 'Sin libros')}
+                    </td>
+                </tr>
             `;
         }
+        html += `</tbody></table></div>`;
         resultadosDiv.innerHTML = html;
     }
+    window.confirmarEntregaDirecta = async (alumnoId, nombre) => {
+        if(confirm(`¿Confirmar entrega de lote para ${nombre}? Se marcará como entregado y podrá firmar la ficha.`)) {
+            await supabase
+                .from('historial_alumnos')
+                .update({ lote_entregado: true, fecha_entrega: new Date().toISOString().slice(0,10) })
+                .eq('alumno_id', alumnoId)
+                .eq('ano_academico_id', currentAnoId);
+            
+            alert(`✅ Entrega confirmada para ${nombre}`);
+            // Refrescar la búsqueda
+            buscarAlumnosParaEntrega();
+        }
+    };
+    
     window.imprimirFichaAlumno = async (alumnoId) => {
         // Redirige a la edición y simula clic en imprimir
         window.editarAlumno(alumnoId);
@@ -2869,6 +2902,7 @@
     
     window.seleccionarAlumnoRecoger = async (alumnoId) => {
         alumnoSeleccionadoRecoger = alumnoId;
+        devolucionLibros = [];
         
         const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
         const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
@@ -2888,13 +2922,15 @@
             devuelto: false
         }));
         
+        // Ocultar resultados y mostrar el panel de devolución
         document.getElementById('recogerResultados').innerHTML = `
-            <div class="alumno-row" style="border-left-color:#10b981;">
+            <div class="alumno-row" style="border-left-color:#10b981; margin-bottom:15px;">
                 <div class="alumno-info">
                     <strong>✅ Alumno seleccionado: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                     📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
                     📚 Libros prestados: ${devolucionLibros.length}
                 </div>
+                <button onclick="cancelarSeleccionRecoger()" class="secondary">✖ Cambiar alumno</button>
             </div>
         `;
         
@@ -2902,8 +2938,19 @@
         mostrarListaDevolucionRecoger();
     };
     
+    window.cancelarSeleccionRecoger = () => {
+        alumnoSeleccionadoRecoger = null;
+        devolucionLibros = [];
+        document.getElementById('recogerResultados').innerHTML = '';
+        document.getElementById('recogerLoteInfo').style.display = 'none';
+        document.getElementById('recogerLoteInfo').innerHTML = '<div id="recogerDetalle"></div>';
+        buscarAlumnosParaRecoger(); // Refrescar lista
+    };
+    
     function mostrarListaDevolucionRecoger() {
         const container = document.getElementById('recogerDetalle');
+        if (!container) return;
+        
         const todosDevueltos = devolucionLibros.every(l => l.devuelto);
         
         let html = `<h4>📚 Libros a devolver:</h4>`;
@@ -2921,7 +2968,7 @@
             html += `<div style="margin-top:15px;">`;
             for (const libro of devolucionLibros) {
                 const clase = libro.devuelto ? 'tachado' : '';
-                html += `<div class="alumno-row ${clase}">
+                html += `<div class="alumno-row ${clase}" style="margin-bottom:8px;">
                     <div class="alumno-info">📖 ${libro.titulo} ${libro.devuelto ? '✅ DEVUELTO' : '⏳ PENDIENTE'}</div>
                 </div>`;
             }
@@ -2943,6 +2990,7 @@
             if (btnFinalizar) {
                 btnFinalizar.onclick = function() {
                     alumnoSeleccionadoRecoger = null;
+                    devolucionLibros = [];
                     mostrarRecogerLote();
                 };
             }
@@ -2951,6 +2999,7 @@
             if (btnCerrar) {
                 btnCerrar.onclick = function() {
                     alumnoSeleccionadoRecoger = null;
+                    devolucionLibros = [];
                     mostrarRecogerLote();
                 };
             }
