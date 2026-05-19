@@ -867,63 +867,64 @@
             <div style="background:#fef3c7; padding:12px; border-radius:12px; margin:12px 0;">
                 <small>📌 Nota: Socio AMPA y Donante se editan desde las secciones "SOCIOS AMPA" y "BIBLIOTECA" respectivamente.</small>
             </div>
-            // Mostrar libros con todos los detalles
-            // Mostrar libros con todos los detalles
-            if (prestamos && prestamos.length > 0) {
-                var tituloSeccion = !loteEntregado ? '📦 LOTE PREPARADO (pendiente de recoger)' : '📚 LIBROS PRESTADOS';
-                var colorFondo = !loteEntregado ? '#fef3c7' : '#dcfce7';
-                var colorBorde = !loteEntregado ? '#f59e0b' : '#10b981';
-                
-                var librosHtml = '<h3>' + tituloSeccion + '</h3>';
-                librosHtml += '<div style="background:' + colorFondo + '; padding:12px; border-radius:12px; margin-bottom:15px; border-left:4px solid ' + colorBorde + ';">';
-                
-                for (var i = 0; i < prestamos.length; i++) {
-                    var p = prestamos[i];
-                    var libro = p.libros;
-                    var estadoColor = '';
-                    if (libro && libro.estado === 'desgastado') estadoColor = '#dc2626';
-                    else if (libro && libro.estado === 'usado') estadoColor = '#f59e0b';
-                    else estadoColor = '#10b981';
-                    
-                    librosHtml += '<div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #e2e8f0;">';
-                    librosHtml += '<div><strong>📖 ' + (libro ? libro.titulo : 'Sin título') + '</strong></div>';
-                    librosHtml += '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:4px; font-size:0.8rem; margin-top:5px;">';
-                    librosHtml += '<div>📚 Materia: ' + (libro ? (libro.materia || '-') : '-') + '</div>';
-                    librosHtml += '<div>🎓 Curso: ' + (libro ? (libro.curso_para || '-') : '-') + '</div>';
-                    librosHtml += '<div>🏢 Editorial: ' + (libro ? (libro.editorial || '-') : '-') + '</div>';
-                    librosHtml += '<div>🔢 Signatura: ' + (libro ? (libro.signatura || '-') : '-') + '</div>';
-                    librosHtml += '<div>📌 Estado libro: <span style="color:' + estadoColor + '">' + (libro ? (libro.estado || 'nuevo') : 'nuevo') + '</span></div>';
-                    librosHtml += '<div>📅 Fecha préstamo: ' + (p.fecha_prestamo || '-') + '</div>';
-                    if (libro && libro.incidencia) {
-                        librosHtml += '<div>⚠️ Incidencia: ' + libro.incidencia + '</div>';
-                    }
-                    librosHtml += '</div></div>';
-                }
-                
-                if (!loteEntregado) {
-                    librosHtml += '<p style="margin-top:10px; font-size:0.75rem;"><small>⚠️ El alumno aún no ha recogido este lote. Debe confirmar la entrega en la sección "Entregar lote" de PRÉSTAMOS.</small></p>';
-                }
-                
-                librosHtml += '</div>';
-                html += librosHtml;
-            } else {
-                html += '<p>No tiene libros prestados actualmente</p>';
-            }
-
+            <div id="librosSeccion"></div>
             ${donacionesHtml}
             <div class="flex">
                 <button id="guardarAlumnoBtn">💾 Guardar</button>
                 ${alumnoId ? '<button id="imprimirAlumnoBtn" class="secondary">🖨️ Imprimir ficha</button>' : ''}
                 ${alumnoId ? '<button id="bajaAlumnoBtn" class="danger">🗑️ Dar de baja</button>' : ''}
-                
             </div>
         </div>`;
+        
         document.getElementById('mainPanel').innerHTML = html;
         
         if(document.getElementById('editCurso')) document.getElementById('editCurso').value = historialActual?.curso || '1ESO';
         
+        // Rellenar la sección de libros
+        if (prestamos && prestamos.length > 0) {
+            var tituloSeccion = !loteEntregado ? '📦 LOTE PREPARADO (pendiente de recoger)' : '📚 LIBROS PRESTADOS';
+            var colorFondo = !loteEntregado ? '#fef3c7' : '#dcfce7';
+            var colorBorde = !loteEntregado ? '#f59e0b' : '#10b981';
+            
+            var librosHtml = '<h3>' + tituloSeccion + '</h3>';
+            librosHtml += '<div style="background:' + colorFondo + '; padding:12px; border-radius:12px; margin-bottom:15px; border-left:4px solid ' + colorBorde + ';">';
+            
+            for (var i = 0; i < prestamos.length; i++) {
+                var p = prestamos[i];
+                var libro = p.libros;
+                var estadoColor = '';
+                if (libro && libro.estado === 'desgastado') estadoColor = '#dc2626';
+                else if (libro && libro.estado === 'usado') estadoColor = '#f59e0b';
+                else estadoColor = '#10b981';
+                
+                librosHtml += '<div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #e2e8f0;">';
+                librosHtml += '<div><strong>📖 ' + (libro ? libro.titulo : 'Sin título') + '</strong></div>';
+                librosHtml += '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:4px; font-size:0.8rem; margin-top:5px;">';
+                librosHtml += '<div>📚 Materia: ' + (libro ? (libro.materia || '-') : '-') + '</div>';
+                librosHtml += '<div>🎓 Curso: ' + (libro ? (libro.curso_para || '-') : '-') + '</div>';
+                librosHtml += '<div>🏢 Editorial: ' + (libro ? (libro.editorial || '-') : '-') + '</div>';
+                librosHtml += '<div>🔢 Signatura: ' + (libro ? (libro.signatura || '-') : '-') + '</div>';
+                librosHtml += '<div>📌 Estado libro: <span style="color:' + estadoColor + '">' + (libro ? (libro.estado || 'nuevo') : 'nuevo') + '</span></div>';
+                librosHtml += '<div>📅 Fecha préstamo: ' + (p.fecha_prestamo || '-') + '</div>';
+                if (libro && libro.incidencia) {
+                    librosHtml += '<div>⚠️ Incidencia: ' + libro.incidencia + '</div>';
+                }
+                librosHtml += '</div></div>';
+            }
+            
+            if (!loteEntregado) {
+                librosHtml += '<p style="margin-top:10px; font-size:0.75rem;"><small>⚠️ El alumno aún no ha recogido este lote. Debe confirmar la entrega en la sección "Entregar lote" de PRÉSTAMOS.</small></p>';
+            }
+            
+            librosHtml += '</div>';
+            document.getElementById('librosSeccion').innerHTML = librosHtml;
+        } else {
+            document.getElementById('librosSeccion').innerHTML = '<p>No tiene libros prestados actualmente</p>';
+        }
+        
+        // ========== BOTÓN GUARDAR ==========
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
-            // VALIDAR TELÉFONO (obligatorio, 9 dígitos)
+            // Validar teléfono (obligatorio, 9 dígitos)
             const telefono = document.getElementById('editTelefono').value.trim();
             if (!telefono) {
                 alert("El teléfono es obligatorio");
@@ -934,11 +935,9 @@
                 return;
             }
             
-
             let nuevoAlumnoId = alumnoId;
             
             if(!alumnoId) {
-                // 1. Crear el alumno
                 const { data: nuevo, error } = await supabase.from('alumnos').insert({ 
                     nombre: document.getElementById('editNombre').value,
                     apellidos: document.getElementById('editApellidos').value
@@ -946,7 +945,6 @@
                 if(error) { alert('Error: ' + error.message); return; }
                 nuevoAlumnoId = nuevo.id;
                 
-                // 2. Crear su historial para el año activo
                 const historialDataCompleto = {
                     alumno_id: nuevoAlumnoId,
                     ano_academico_id: currentAnoId,
@@ -969,7 +967,6 @@
                 return;
             }
             
-            // Si es edición (alumno ya existe)
             await supabase.from('alumnos').update({ 
                 nombre: document.getElementById('editNombre').value,
                 apellidos: document.getElementById('editApellidos').value
@@ -1001,16 +998,15 @@
             cargarAlumnos();
         };
         
+        // ========== IMPRIMIR FICHA ==========
         if(document.getElementById('imprimirAlumnoBtn')) {
             document.getElementById('imprimirAlumnoBtn').onclick = async () => {
-                // Obtener libros prestados actualmente (no devueltos)
                 const { data: prestamosActivos } = await supabase
                     .from('prestamos')
                     .select('*, libros(*)')
                     .eq('alumno_id', alumnoId)
                     .eq('entregado', false);
                 
-                // Obtener historial de préstamos (devueltos)
                 const { data: prestamosHistoricos } = await supabase
                     .from('prestamos')
                     .select('*, libros(*)')
@@ -1026,95 +1022,22 @@
                         <title>Ficha de ${alumno?.nombre} ${alumno?.apellidos || ''}</title>
                         <style>
                             * { margin: 0; padding: 0; box-sizing: border-box; }
-                            body {
-                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                                padding: 40px;
-                                background: white;
-                                color: #1e293b;
-                            }
-                            .header {
-                                text-align: center;
-                                margin-bottom: 30px;
-                                padding-bottom: 20px;
-                                border-bottom: 3px solid #2563eb;
-                            }
-                            .header h1 {
-                                color: #1e40af;
-                                font-size: 24px;
-                                margin-bottom: 5px;
-                            }
-                            .header p {
-                                color: #64748b;
-                                font-size: 14px;
-                            }
-                            .titulo-ficha {
-                                background: #f8fafc;
-                                padding: 12px;
-                                border-radius: 8px;
-                                margin: 20px 0;
-                                text-align: center;
-                                border-left: 4px solid #2563eb;
-                            }
-                            .datos {
-                                display: grid;
-                                grid-template-columns: repeat(3, 1fr);
-                                gap: 12px;
-                                margin-bottom: 30px;
-                                background: #f1f5f9;
-                                padding: 20px;
-                                border-radius: 12px;
-                            }
-                            .dato {
-                                font-size: 14px;
-                            }
-                            .dato strong {
-                                color: #1e40af;
-                            }
-                            table {
-                                width: 100%;
-                                border-collapse: collapse;
-                                margin: 15px 0;
-                            }
-                            th, td {
-                                border: 1px solid #cbd5e1;
-                                padding: 10px;
-                                text-align: left;
-                                font-size: 13px;
-                            }
-                            th {
-                                background: #2563eb;
-                                color: white;
-                            }
-                            .compromiso {
-                                margin-top: 40px;
-                                padding: 20px;
-                                background: #fef3c7;
-                                border-radius: 8px;
-                                font-size: 12px;
-                                text-align: center;
-                            }
-                            .firma {
-                                margin-top: 40px;
-                                display: flex;
-                                justify-content: space-between;
-                                padding-top: 40px;
-                            }
-                            .firma-linea {
-                                text-align: center;
-                                width: 45%;
-                            }
-                            .firma-linea hr {
-                                margin-top: 10px;
-                                width: 100%;
-                            }
-                            .footer {
-                                margin-top: 40px;
-                                text-align: center;
-                                font-size: 10px;
-                                color: #94a3b8;
-                                border-top: 1px solid #e2e8f0;
-                                padding-top: 20px;
-                            }
+                            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; background: white; color: #1e293b; }
+                            .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #2563eb; }
+                            .header h1 { color: #1e40af; font-size: 24px; margin-bottom: 5px; }
+                            .header p { color: #64748b; font-size: 14px; }
+                            .titulo-ficha { background: #f8fafc; padding: 12px; border-radius: 8px; margin: 20px 0; text-align: center; border-left: 4px solid #2563eb; }
+                            .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 30px; background: #f1f5f9; padding: 20px; border-radius: 12px; }
+                            .dato { font-size: 14px; }
+                            .dato strong { color: #1e40af; }
+                            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+                            th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-size: 13px; }
+                            th { background: #2563eb; color: white; }
+                            .compromiso { margin-top: 40px; padding: 20px; background: #fef3c7; border-radius: 8px; font-size: 12px; text-align: center; }
+                            .firma { margin-top: 40px; display: flex; justify-content: space-between; padding-top: 40px; }
+                            .firma-linea { text-align: center; width: 45%; }
+                            .firma-linea hr { margin-top: 10px; width: 100%; }
+                            .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
                         </style>
                     </head>
                     <body>
@@ -1123,11 +1046,7 @@
                             <p>Villaviciosa - Banco de Libros</p>
                             <p>Año Académico: ${historialActual?.ano_academico_id === currentAnoId ? 'Actual' : 'Anterior'}</p>
                         </div>
-                        
-                        <div class="titulo-ficha">
-                            <h2>📄 FICHA DEL ALUMNO</h2>
-                        </div>
-                        
+                        <div class="titulo-ficha"><h2>📄 FICHA DEL ALUMNO</h2></div>
                         <div class="datos">
                             <div class="dato"><strong>Código:</strong> ${alumno?.codigo_usuario || 'Sin código'}</div>
                             <div class="dato"><strong>Nombre:</strong> ${alumno?.nombre} ${alumno?.apellidos || ''}</div>
@@ -1138,12 +1057,9 @@
                             <div class="dato"><strong>Socio AMPA:</strong> ${historialActual?.socio_ampa ? 'Sí' : 'No'}</div>
                             <div class="dato"><strong>Donante:</strong> ${historialActual?.donante ? 'Sí' : 'No'}</div>
                         </div>
-                        
                         <h3>📚 LIBROS PRESTADOS (${prestamosActivos?.length || 0})</h3>
                         <table>
-                            <thead>
-                                <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th><th>Signatura</th><th>Estado</th><th>Fecha préstamo</th></tr>
-                            </thead>
+                            <thead><tr><th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th><th>Signatura</th><th>Estado</th><th>Fecha préstamo</th></tr></thead>
                             <tbody>
                                 ${prestamosActivos?.map(p => `
                                     <tr>
@@ -1158,12 +1074,9 @@
                                 `).join('') || '<tr><td colspan="7">No tiene libros prestados actualmente</td></tr>'}
                             </tbody>
                         </table>
-                        
                         <h3>📜 HISTÓRICO DE PRÉSTAMOS DEVUELTOS (${prestamosHistoricos?.length || 0})</h3>
                         <table>
-                            <thead>
-                                <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Fecha préstamo</th><th>Fecha devolución</th></tr>
-                            </thead>
+                            <thead><tr><th>Título</th><th>Materia</th><th>Curso</th><th>Fecha préstamo</th><th>Fecha devolución</th></tr></thead>
                             <tbody>
                                 ${prestamosHistoricos?.map(p => `
                                     <tr>
@@ -1176,26 +1089,15 @@
                                 `).join('') || '<tr><td colspan="5">No hay historial de devoluciones</td></tr>'}
                             </tbody>
                         </table>
-                        
                         <div class="compromiso">
                             <p><strong>📌 COMPROMISO DEL ALUMNO/A</strong></p>
-                            <p>El/la abajo firmante se compromete a hacer buen uso de los libros recibidos,<br>
-                            a devolverlos en el mismo estado en que los recibe al finalizar el curso académico,<br>
-                            y a comunicar cualquier pérdida o deterioro al departamento correspondiente.</p>
+                            <p>El/la abajo firmante se compromete a hacer buen uso de los libros recibidos, a devolverlos en el mismo estado en que los recibe al finalizar el curso académico, y a comunicar cualquier pérdida o deterioro al departamento correspondiente.</p>
                             <p>En ${new Date().toLocaleDateString()}</p>
                         </div>
-                        
                         <div class="firma">
-                            <div class="firma-linea">
-                                <p>Firma del alumno/a</p>
-                                <hr>
-                            </div>
-                            <div class="firma-linea">
-                                <p>Firma del padre/madre/tutor</p>
-                                <hr>
-                            </div>
+                            <div class="firma-linea"><p>Firma del alumno/a</p><hr></div>
+                            <div class="firma-linea"><p>Firma del padre/madre/tutor</p><hr></div>
                         </div>
-                        
                         <div class="footer">
                             <p>Instituto Victor García de la Concha - Villaviciosa | Banco de Libros</p>
                             <p>Documento generado automáticamente - Fecha: ${new Date().toLocaleString()}</p>
@@ -1207,6 +1109,7 @@
             };
         }
         
+        // ========== DAR DE BAJA ALUMNO ==========
         if(document.getElementById('bajaAlumnoBtn')) {
             document.getElementById('bajaAlumnoBtn').onclick = () => {
                 if(confirm('¿Dar de baja a este alumno? Se conservará el historial.')) {
@@ -1221,6 +1124,7 @@
             };
         }
     };
+
     
     window.devolverLibroRapido = async (prestamoId) => {
         await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', prestamoId);
