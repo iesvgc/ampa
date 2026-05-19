@@ -2566,7 +2566,7 @@
                         <h4>📚 Libros a prestar (<span id="prepararLoteCount">0</span>)</h4>
                         <div id="prepararListaLibros"></div>
                         <button id="btnPrepararEscanear" class="success" disabled>📷 Escanear libro</button>
-                        <button id="btnPrepararGuardar" class="success" disabled>💾 Guardar préstamo</button>
+                        <button id="btnPrepararGuardar" class="success" disabled>💾 Guardar lote preparado</button>
                     </div>
                 </div>
             </div>
@@ -2827,7 +2827,7 @@
             return;
         }
         if (loteTemporalPrestamo.length === 0) {
-            alert("No hay libros para prestar");
+            alert("No hay libros para preparar");
             return;
         }
         
@@ -2843,7 +2843,14 @@
             if (!error) exitos++;
         }
         
-        alert(`✅ ${exitos} libros prestados a ${alumnoSeleccionadoPreparar.nombre}`);
+        // Asegurar que lote_entregado = false (preparado, no prestado aún)
+        await supabase
+            .from('historial_alumnos')
+            .update({ lote_entregado: false })
+            .eq('alumno_id', alumnoSeleccionadoPreparar.id)
+            .eq('ano_academico_id', currentAnoId);
+        
+        alert(`✅ ${exitos} libros preparados para ${alumnoSeleccionadoPreparar.nombre}`);
         loteTemporalPrestamo = [];
         alumnoSeleccionadoPreparar = null;
         mostrarPrepararLote();
