@@ -1240,19 +1240,9 @@
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
-        // Obtener información de socio para cada resultado
+        // Usar socio_ampa directamente del historial (sin consultar tabla socios)
         for (const alumno of resultados) {
-            const { data: socio } = await supabaseDebug
-                .from('socios')
-                .select('*')
-                .eq('alumno_id', alumno.id)
-                .eq('ano_academico_id', anoId)
-                .maybeSingle();
-            
-            alumno.esSocio = socio && socio.activo !== false;
-            alumno.haPagado = socio?.pagado || false;
-            alumno.n_socio = socio?.n_socio || null;
-            alumno.fecha_pago = socio?.fecha_pago || null;
+            alumno.esSocio = alumno.socio_ampa === true;
         }
         
         // Filtrar por estado socio (solo si está seleccionado "socio")
@@ -1274,7 +1264,6 @@
                         <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                         📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
                         ${alumno.esSocio ? '✅ Socio AMPA' : '❌ No es socio'}
-                        ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio}` : ''}
                     </div>
                     <div class="alumno-actions">
                         ${!alumno.esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
@@ -1285,7 +1274,6 @@
         }
         resultadosDiv.innerHTML = html;
     }
-
     window.imprimirFichaAlumno = async (alumnoId) => {
         // Redirige a la edición y simula clic en imprimir
         window.editarAlumno(alumnoId);
@@ -1303,10 +1291,9 @@
         
         const fecha = new Date().toISOString().slice(0,10);
         
-        // Obtener año activo
         const { data: anoActivo } = await supabase.from('ano_academico').select('id').eq('activo', true).single();
         
-        // 1. Actualizar historial del alumno (socio_ampa = true)
+        // Actualizar historial del alumno
         const { error: histError } = await supabase
             .from('historial_alumnos')
             .update({ socio_ampa: true })
@@ -1318,19 +1305,14 @@
             return;
         }
         
-        // 2. Insertar en tabla socios (opcional, para tener el número y fecha)
-        const { error: insertError } = await supabase.from('socios').insert({
+        // Insertar en tabla socios (opcional, para el número de socio)
+        await supabase.from('socios').insert({
             alumno_id: alumnoId,
             ano_academico_id: anoActivo.id,
             fecha_pago: fecha,
             pagado: true,
             activo: true
         });
-        
-        if (insertError) {
-            console.error("Error al insertar en socios:", insertError);
-            // No alertamos porque el socio ya está marcado en historial
-        }
         
         alert('✅ Socio registrado correctamente');
         buscarSociosMejorado();
@@ -1363,10 +1345,9 @@
         
         if(!confirm('¿Dar de baja a este socio? Se conservará el historial.')) return;
         
-        // Obtener año activo
         const { data: anoActivo } = await supabase.from('ano_academico').select('id').eq('activo', true).single();
         
-        // Dar de baja directamente actualizando historial (más simple)
+        // Actualizar historial del alumno
         const { error } = await supabase
             .from('historial_alumnos')
             .update({ socio_ampa: false })
@@ -1378,7 +1359,7 @@
             return;
         }
         
-        // Opcional: también marcar socio como inactivo en tabla socios
+        // Opcional: marcar socio como inactivo en tabla socios
         await supabase
             .from('socios')
             .update({ activo: false })
