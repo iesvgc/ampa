@@ -1562,28 +1562,21 @@
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
-        // Usar socio_ampa directamente del historial (sin consultar tabla socios)
+        // Obtener información de socio (n_socio) para cada resultado
         for (const alumno of resultados) {
-            alumno.esSocio = alumno.socio_ampa === true;
-            
-            // Obtener el número de socio solo si es socio
-            if (alumno.esSocio) {
-                const { data: socio } = await supabaseDebug
-                    .from('socios')
-                    .select('n_socio')
-                    .eq('alumno_id', alumno.id)
-                    .eq('ano_academico_id', anoId)
-                    .eq('activo', true)
-                    .maybeSingle();
-                alumno.n_socio = socio?.n_socio || null;
-            } else {
-                alumno.n_socio = null;
-            }
+            const { data: socio } = await supabaseDebug
+                .from('socios')
+                .select('n_socio')
+                .eq('alumno_id', alumno.id)
+                .eq('ano_academico_id', anoId)
+                .eq('activo', true)
+                .maybeSingle();
+            alumno.n_socio = socio?.n_socio || null;
         }
         
-        // Filtrar por estado socio (solo si está seleccionado "socio")
+        // Filtrar por estado socio
         if (estadoFiltro === 'socio') {
-            resultados = resultados.filter(a => a.esSocio === true);
+            resultados = resultados.filter(a => a.socio_ampa === true);
         }
         
         if (resultados.length === 0) {
@@ -1591,43 +1584,26 @@
             return;
         }
         
-        let html = `<h3>Resultados (${resultados.length})</h3>
-            <div style="overflow-x:auto;">
-                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
-                    <thead><tr style="background:#2563eb; color:white;">
-                        <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                        <th>Beca</th><th>Socio</th><th>Libros</th><th>Acción</th>
-                    </tr></thead>
-                    <tbody>`;
+        // Mostrar resultados con el formato original de socios (no tabla de préstamos)
+        let html = `<h3>Resultados (${resultados.length})</h3>`;
         
-        for (const a of resultados) {
-            // Obtener número de libros prestados para este alumno
-            const { count: librosPrestados } = await supabase
-                .from('prestamos')
-                .select('*', { count: 'exact', head: true })
-                .eq('alumno_id', a.id)
-                .eq('entregado', false);
-            
-            const yaEntregado = a.lote_entregado || false;
-            const estadoEntrega = yaEntregado ? '✅ Entregado' : (librosPrestados > 0 ? '⏳ Pendiente' : 'Sin libros');
-            
+        for (const alumno of resultados) {
+            const esSocio = alumno.socio_ampa === true;
             html += `
-                <tr style="border-bottom:1px solid #ddd;">
-                    <td style="padding:6px;">${a.codigo_usuario || '-'}</td>
-                    <td style="padding:6px;">${a.nombre}</td>
-                    <td style="padding:6px;">${a.apellidos || ''}</td>
-                    <td style="padding:6px;">${a.curso}</td>
-                    <td style="padding:6px;">${a.grupo || ''}</td>
-                    <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
-                    <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
-                    <td style="padding:6px; text-align:center;">${librosPrestados}</td>
-                    <td style="padding:6px;">
-                        ${!yaEntregado && librosPrestados > 0 ? `<button onclick="confirmarEntregaDirecta(${a.id}, '${a.nombre}')" style="background:#10b981;">✅ Entregar lote</button>` : (yaEntregado ? '✅ Ya entregado' : 'Sin libros')}
-                    </td>
-                </tr>
+                <div class="alumno-row">
+                    <div class="alumno-info">
+                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
+                        ${esSocio ? '✅ Socio AMPA' : '❌ No es socio'}
+                        ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio}` : ''}
+                    </div>
+                    <div class="alumno-actions">
+                        ${!esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
+                        ${esSocio ? `<button class="danger" onclick="window.darBajaSocio(${alumno.id})">🗑️ Dar baja socio</button>` : ''}
+                    </div>
+                </div>
             `;
         }
-        html += `</tbody></table></div>`;
         resultadosDiv.innerHTML = html;
     }
     window.confirmarEntregaDirecta = async (alumnoId, nombre) => {
