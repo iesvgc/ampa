@@ -867,26 +867,48 @@
             <div style="background:#fef3c7; padding:12px; border-radius:12px; margin:12px 0;">
                 <small>📌 Nota: Socio AMPA y Donante se editan desde las secciones "SOCIOS AMPA" y "BIBLIOTECA" respectivamente.</small>
             </div>
-            ${!loteEntregado && prestamos?.length > 0 ? `
-                <h3>📦 LOTE PREPARADO (pendiente de recoger)</h3>
-                <div style="background:#fef3c7; padding:12px; border-radius:12px; margin-bottom:15px;">
-                    ${prestamos.map(p => `<div>📖 ${p.libros?.titulo}</div>`).join('')}
-                    <p style="margin-top:10px;"><small>⚠️ El alumno aún no ha recogido este lote. Debe confirmar la entrega en la sección "Entregar lote" de PRÉSTAMOS.</small></p>
-                </div>
-            ` : ''}
-            
-            ${loteEntregado && prestamos?.length > 0 ? `
-                <h3>📚 LIBROS PRESTADOS</h3>
-                <div id="prestamosLista">${prestamos.map(p => `<div>📖 ${p.libros?.titulo} <button onclick="window.devolverLibroRapido(${p.id})">Devolver</button></div>`).join('')}</div>
-            ` : ''}
-            
-            ${prestamos?.length === 0 ? '<p>No tiene libros prestados actualmente</p>' : ''}
+            // Mostrar libros con todos los detalles
+            if (prestamos?.length > 0) {
+                const tituloSeccion = !loteEntregado ? '📦 LOTE PREPARADO (pendiente de recoger)' : '📚 LIBROS PRESTADOS';
+                const colorFondo = !loteEntregado ? '#fef3c7' : '#dcfce7';
+                const colorBorde = !loteEntregado ? '#f59e0b' : '#10b981';
+                
+                let librosHtml = `<h3>${tituloSeccion}</h3>`;
+                librosHtml += `<div style="background:${colorFondo}; padding:12px; border-radius:12px; margin-bottom:15px; border-left:4px solid ${colorBorde};">`;
+                
+                for (const p of prestamos) {
+                    const libro = p.libros;
+                    librosHtml += `
+                        <div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #e2e8f0;">
+                            <div><strong>📖 ${libro?.titulo || 'Sin título'}</strong></div>
+                            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:4px; font-size:0.8rem; margin-top:5px;">
+                                <div>📚 Materia: ${libro?.materia || '-'}</div>
+                                <div>🎓 Curso: ${libro?.curso_para || '-'}</div>
+                                <div>🏢 Editorial: ${libro?.editorial || '-'}</div>
+                                <div>🔢 Signatura: ${libro?.signatura || '-'}</div>
+                                <div>📌 Estado libro: <span style="color:${libro?.estado === 'desgastado' ? '#dc2626' : (libro?.estado === 'usado' ? '#f59e0b' : '#10b981')}">${libro?.estado || 'nuevo'}</span></div>
+                                <div>📅 Fecha préstamo: ${p.fecha_prestamo || '-'}</div>
+                                ${libro?.incidencia ? `<div>⚠️ Incidencia: ${libro.incidencia}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (!loteEntregado) {
+                    librosHtml += `<p style="margin-top:10px; font-size:0.75rem;"><small>⚠️ El alumno aún no ha recogido este lote. Debe confirmar la entrega en la sección "Entregar lote" de PRÉSTAMOS.</small></p>`;
+                }
+                
+                librosHtml += `</div>`;
+                html += librosHtml;
+            } else {
+                html += `<p>No tiene libros prestados actualmente</p>`;
+            }
             ${donacionesHtml}
             <div class="flex">
                 <button id="guardarAlumnoBtn">💾 Guardar</button>
                 ${alumnoId ? '<button id="imprimirAlumnoBtn" class="secondary">🖨️ Imprimir ficha</button>' : ''}
                 ${alumnoId ? '<button id="bajaAlumnoBtn" class="danger">🗑️ Dar de baja</button>' : ''}
-                <button class="secondary" onclick="window.cargarAlumnos()">Cancelar</button>
+                
             </div>
         </div>`;
         document.getElementById('mainPanel').innerHTML = html;
