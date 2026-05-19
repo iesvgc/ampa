@@ -868,41 +868,48 @@
                 <small>📌 Nota: Socio AMPA y Donante se editan desde las secciones "SOCIOS AMPA" y "BIBLIOTECA" respectivamente.</small>
             </div>
             // Mostrar libros con todos los detalles
-            if (prestamos?.length > 0) {
-                const tituloSeccion = !loteEntregado ? '📦 LOTE PREPARADO (pendiente de recoger)' : '📚 LIBROS PRESTADOS';
-                const colorFondo = !loteEntregado ? '#fef3c7' : '#dcfce7';
-                const colorBorde = !loteEntregado ? '#f59e0b' : '#10b981';
+            // Mostrar libros con todos los detalles
+            if (prestamos && prestamos.length > 0) {
+                var tituloSeccion = !loteEntregado ? '📦 LOTE PREPARADO (pendiente de recoger)' : '📚 LIBROS PRESTADOS';
+                var colorFondo = !loteEntregado ? '#fef3c7' : '#dcfce7';
+                var colorBorde = !loteEntregado ? '#f59e0b' : '#10b981';
                 
-                let librosHtml = `<h3>${tituloSeccion}</h3>`;
-                librosHtml += `<div style="background:${colorFondo}; padding:12px; border-radius:12px; margin-bottom:15px; border-left:4px solid ${colorBorde};">`;
+                var librosHtml = '<h3>' + tituloSeccion + '</h3>';
+                librosHtml += '<div style="background:' + colorFondo + '; padding:12px; border-radius:12px; margin-bottom:15px; border-left:4px solid ' + colorBorde + ';">';
                 
-                for (const p of prestamos) {
-                    const libro = p.libros;
-                    librosHtml += `
-                        <div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #e2e8f0;">
-                            <div><strong>📖 ${libro?.titulo || 'Sin título'}</strong></div>
-                            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:4px; font-size:0.8rem; margin-top:5px;">
-                                <div>📚 Materia: ${libro?.materia || '-'}</div>
-                                <div>🎓 Curso: ${libro?.curso_para || '-'}</div>
-                                <div>🏢 Editorial: ${libro?.editorial || '-'}</div>
-                                <div>🔢 Signatura: ${libro?.signatura || '-'}</div>
-                                <div>📌 Estado libro: <span style="color:${libro?.estado === 'desgastado' ? '#dc2626' : (libro?.estado === 'usado' ? '#f59e0b' : '#10b981')}">${libro?.estado || 'nuevo'}</span></div>
-                                <div>📅 Fecha préstamo: ${p.fecha_prestamo || '-'}</div>
-                                ${libro?.incidencia ? `<div>⚠️ Incidencia: ${libro.incidencia}</div>` : ''}
-                            </div>
-                        </div>
-                    `;
+                for (var i = 0; i < prestamos.length; i++) {
+                    var p = prestamos[i];
+                    var libro = p.libros;
+                    var estadoColor = '';
+                    if (libro && libro.estado === 'desgastado') estadoColor = '#dc2626';
+                    else if (libro && libro.estado === 'usado') estadoColor = '#f59e0b';
+                    else estadoColor = '#10b981';
+                    
+                    librosHtml += '<div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #e2e8f0;">';
+                    librosHtml += '<div><strong>📖 ' + (libro ? libro.titulo : 'Sin título') + '</strong></div>';
+                    librosHtml += '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:4px; font-size:0.8rem; margin-top:5px;">';
+                    librosHtml += '<div>📚 Materia: ' + (libro ? (libro.materia || '-') : '-') + '</div>';
+                    librosHtml += '<div>🎓 Curso: ' + (libro ? (libro.curso_para || '-') : '-') + '</div>';
+                    librosHtml += '<div>🏢 Editorial: ' + (libro ? (libro.editorial || '-') : '-') + '</div>';
+                    librosHtml += '<div>🔢 Signatura: ' + (libro ? (libro.signatura || '-') : '-') + '</div>';
+                    librosHtml += '<div>📌 Estado libro: <span style="color:' + estadoColor + '">' + (libro ? (libro.estado || 'nuevo') : 'nuevo') + '</span></div>';
+                    librosHtml += '<div>📅 Fecha préstamo: ' + (p.fecha_prestamo || '-') + '</div>';
+                    if (libro && libro.incidencia) {
+                        librosHtml += '<div>⚠️ Incidencia: ' + libro.incidencia + '</div>';
+                    }
+                    librosHtml += '</div></div>';
                 }
                 
                 if (!loteEntregado) {
-                    librosHtml += `<p style="margin-top:10px; font-size:0.75rem;"><small>⚠️ El alumno aún no ha recogido este lote. Debe confirmar la entrega en la sección "Entregar lote" de PRÉSTAMOS.</small></p>`;
+                    librosHtml += '<p style="margin-top:10px; font-size:0.75rem;"><small>⚠️ El alumno aún no ha recogido este lote. Debe confirmar la entrega en la sección "Entregar lote" de PRÉSTAMOS.</small></p>';
                 }
                 
-                librosHtml += `</div>`;
+                librosHtml += '</div>';
                 html += librosHtml;
             } else {
-                html += `<p>No tiene libros prestados actualmente</p>`;
+                html += '<p>No tiene libros prestados actualmente</p>';
             }
+
             ${donacionesHtml}
             <div class="flex">
                 <button id="guardarAlumnoBtn">💾 Guardar</button>
