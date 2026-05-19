@@ -1778,11 +1778,13 @@
         const { data: editorialesBD } = await supabase.from('libros').select('editorial').not('editorial', 'is', null);
         const materias = [...new Set(materiasBD.map(m => m.materia))];
         const editoriales = [...new Set(editorialesBD.map(e => e.editorial))];
-
-        
+    
         let html = `
             <div class="card">
-                <div class="flex"><h2>📖 Biblioteca</h2><button id="btnNuevoLibro" class="success">➕ Añadir Libro (escanear)</button></div>
+                <div class="flex"><h2>📖 Biblioteca</h2>
+                    <button id="btnNuevoLibro" class="success">➕ Añadir Libro (escanear)</button>
+                    <button id="btnEscanearInfo" class="secondary">📷 Escanear para ver información</button>
+                </div>
                 <div class="search-filters">
                     <div class="form-grid">
                         <div><label>🔍 Buscar</label><input type="text" id="searchLibroInput" placeholder="Título, signatura o código..."></div>
@@ -1795,9 +1797,14 @@
                             <option value="">Todas</option>
                             ${editoriales.map(e => `<option value="${e}">${e}</option>`).join('')}
                         </select></div>
-                        <div><label>Estado</label><select id="filtroEstado"><option value="">Todos</option><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+                        <div><label>Estado del libro</label><select id="filtroEstado"><option value="">Todos</option><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
                         <div><label>Origen</label><select id="filtroOrigen"><option value="">Todos</option><option>AMPA</option><option>IES</option><option>Donado</option></select></div>
-                        <div><label><input type="checkbox" id="verLibrosInactivos"> 📋 Mostrar libros dados de baja</label></div>                        
+                        <div><label>Estado préstamo</label><select id="filtroEstadoPrestamo">
+                            <option value="">Todos</option>
+                            <option value="prestado">📚 Prestados</option>
+                            <option value="libre">🟢 Libres (disponibles)</option>
+                        </select></div>
+                        <div><label><input type="checkbox" id="verLibrosInactivos"> 📋 Mostrar libros dados de baja</label></div>
                     </div>
                     <button id="btnBuscarLibro">Buscar</button>
                     <button id="btnLimpiarLibro" class="secondary">Limpiar</button>
@@ -1810,6 +1817,7 @@
         document.getElementById('mainPanel').innerHTML = html;
         
         document.getElementById('btnNuevoLibro').onclick = () => { modoActual = "escanear_libro"; abrirScanner(); };
+        document.getElementById('btnEscanearInfo').onclick = () => { modoActual = "escanear_info_libro"; abrirScanner(); };
         document.getElementById('btnBuscarLibro').onclick = () => buscarLibros();
         document.getElementById('btnLimpiarLibro').onclick = limpiarFiltrosLibros;
         
@@ -2082,6 +2090,40 @@
             }
         };
     }
+    async function procesarEscanearInfoLibro(codigo) {
+        const { data: libro, error } = await supabase
+            .from('libros')
+            .select('*')
+            .eq('codigo_barras', codigo)
+            .maybeSingle();
+        
+        if (!libro) {
+            alert(`❌ No se encontró ningún libro con el código: ${codigo}`);
+            return;
+        }
+        
+        // Verificar si está prestado
+        const { data: prestamo } = await supabase
+            .from('prestamos')
+            .select('*, alumnos(*)')
+            .eq('libro_codigo', libro.codigo_barras)
+            .eq('entregado', false)
+            .maybeSingle();
+        
+        const estadoPrestamo = prestamo ? `🔴 Prestado a: ${prestamo.alumnos?.nombre} (desde ${prestamo.fecha_prestamo})` : '🟢 Disponible';
+        
+        alert(`📖 INFORMACIÓN DEL LIBRO\n\n` +
+            `Título: ${libro.titulo}\n` +
+            `Materia: ${libro.materia || '-'}\n` +
+            `Curso: ${libro.curso_para || '-'}\n` +
+            `Editorial: ${libro.editorial || '-'}\n` +
+            `Signatura: ${libro.signatura || '-'}\n` +
+            `Estado: ${libro.estado || 'nuevo'}\n` +
+            `Origen: ${libro.origen || 'IES'}\n` +
+            `Código: ${libro.codigo_barras}\n` +
+            `\n📌 Estado préstamo: ${estadoPrestamo}`);
+    }
+    
     function limpiarFiltrosLibros() {
         document.getElementById('searchLibroInput').value = '';
         document.getElementById('filtroMateria').value = '';
@@ -2156,6 +2198,34 @@
         console.log("Filtros aplicados:", { searchTerm, materia, curso, editorial, estado, origen });
         
         let query = supabase.from('libros').select('*');
+        // Filtrar por estado de préstamo (prestado / libre)
+        const estadoPrestamoFiltro = document.getElementById('filtroEstadoPrestamo').value;
+        
+        if (estadoPrestamoFiltro === 'prestado') {
+            // Solo libros que están prestados actualmente
+            const { data: prestamosActivos } = await supabase
+                .from('prestamos')
+                .select('libro_codigo')
+                .eq('entregado', false);
+            const codigosPrestados = prestamosActivos.map(p => p.libro_codigo);
+            if (codigosPrestados.length > 0) {
+                query = query.in('codigo_barras', codigosPrestados);
+            } else {
+                query = query.in('codigo_barras', ['ninguno']);
+            }
+        } else if (estadoPrestamoFiltro === 'libre') {
+            // Solo libros NO prestados
+            const { data: prestamosActivos } = await supabase
+                .from('prestamos')
+                .select('libro_codigo')
+                .eq('entregado', false);
+            const codigosPrestados = prestamosActivos.map(p => p.libro_codigo);
+            if (codigosPrestados.length > 0) {
+                query = query.not('codigo_barras', 'in', `(${codigosPrestados.join(',')})`);
+            }
+        }
+
+        
         const verSoloBaja = document.getElementById('verLibrosInactivos')?.checked;
         
         if (verSoloBaja) {
@@ -3548,6 +3618,9 @@
         else if (modoActual === "prestar_libro_lote") {
             await procesarLibroParaLote(codigo);
         }
+        else if (modoActual === "escanear_info_libro") {
+            await procesarEscanearInfoLibro(codigo);
+        }            
         else if (modoActual === "devolucion_libro") {
             await procesarDevolucionLibro(codigo);
         }
