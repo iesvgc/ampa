@@ -510,8 +510,6 @@
     let alumnoSeleccionadoEntrega = null;
     
     async function mostrarEntregarLote() {
-        alumnoSeleccionadoEntrega = null;
-        
         let html = `
             <div style="margin-top:20px;">
                 <h3>✅ Entregar lote (confirmar recogida y firma)</h3>
@@ -531,9 +529,6 @@
                     <button id="btnEntregarBuscarClase" class="secondary">🔍 Buscar por clase</button>
                 </div>
                 <div id="entregarResultados" class="resultados" style="margin-top:10px;"></div>
-                <div id="entregarLoteInfo" style="margin-top:20px; display:none;">
-                    <div id="entregarDetalle"></div>
-                </div>
             </div>
         `;
         document.getElementById('subpanelPrestamos').innerHTML = html;
@@ -545,8 +540,6 @@
             document.getElementById('entregarCurso').value = '';
             document.getElementById('entregarCodigo').value = '';
             document.getElementById('entregarResultados').innerHTML = '';
-            document.getElementById('entregarLoteInfo').style.display = 'none';
-            alumnoSeleccionadoEntrega = null;
         };
         document.getElementById('btnEntregarBuscarClase').onclick = () => mostrarBuscarClaseEntrega();
         
@@ -583,17 +576,46 @@
             return;
         }
         
-        let resultados = historiales.map(h => ({
-            id: h.alumnos.id,
-            nombre: h.alumnos.nombre,
-            apellidos: h.alumnos.apellidos,
-            codigo_usuario: h.alumnos.codigo_usuario,
-            curso: h.curso,
-            grupo: h.grupo,
-            beca: h.beca,
-            socio_ampa: h.socio_ampa
-        }));
+        let resultados = [];
+        for (const h of historiales) {
+            const { count: librosPrestados } = await supabase
+                .from('prestamos')
+                .select('*', { count: 'exact', head: true })
+                .eq('alumno_id', h.alumnos.id)
+                .eq('entregado', false);
+            
+            const yaEntregado = h.lote_entregado || false;
+            let estado = '';
+            let colorEstado = '';
+            
+            if (yaEntregado) {
+                estado = '✅ Lote entregado';
+                colorEstado = '#10b981';
+            } else if (librosPrestados > 0) {
+                estado = '📦 Lote preparado (pendiente)';
+                colorEstado = '#f59e0b';
+            } else {
+                estado = '❌ Sin libros asignados';
+                colorEstado = '#64748b';
+            }
+            
+            resultados.push({
+                id: h.alumnos.id,
+                nombre: h.alumnos.nombre,
+                apellidos: h.alumnos.apellidos,
+                codigo_usuario: h.alumnos.codigo_usuario,
+                curso: h.curso,
+                grupo: h.grupo,
+                beca: h.beca,
+                socio_ampa: h.socio_ampa,
+                estado: estado,
+                colorEstado: colorEstado,
+                yaEntregado: yaEntregado,
+                librosPrestados: librosPrestados
+            });
+        }
         
+        // Filtrar
         if (codigoRaw) {
             resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
         }
@@ -612,12 +634,12 @@
             return;
         }
         
-        let html = `<h3>Selecciona un alumno (${resultados.length} resultados)</h3>
+        let html = `<h3>Resultados (${resultados.length})</h3>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead><tr style="background:#2563eb; color:white;">
                         <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                        <th>Beca</th><th>Socio</th><th></th>
+                        <th>Beca</th><th>Socio</th><th>Estado</th><th>Acción</th>
                     </tr></thead>
                     <tbody>`;
         
@@ -631,7 +653,10 @@
                     <td style="padding:6px;">${a.grupo || ''}</td>
                     <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
                     <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
-                    <td style="padding:6px;"><button onclick="seleccionarAlumnoEntrega(${a.id})">Seleccionar</button></td>
+                    <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
+                    <td style="padding:6px;">
+                        ${!a.yaEntregado && a.librosPrestados > 0 ? `<button onclick="confirmarEntregaDirecta(${a.id}, '${a.nombre}')" style="background:#10b981;">✅ Entregar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}
+                    </td>
                 </tr>
             `;
         }
@@ -686,6 +711,7 @@
     };
     
     // Función para buscar por clase (se mantiene pero se mejora la visualización)
+    // Función para buscar por clase (misma tabla)
     async function mostrarBuscarClaseEntrega() {
         let html = `
             <div style="margin-top:15px; padding:15px; background:#f8fafc; border-radius:16px;">
@@ -703,13 +729,8 @@
             </div>
         `;
         
-        const entregaInfoDiv = document.getElementById('entregarDetalle');
-        if (entregaInfoDiv) {
-            entregaInfoDiv.innerHTML = html;
-        } else {
-            document.getElementById('entregarLoteInfo').innerHTML = html;
-            document.getElementById('entregarLoteInfo').style.display = 'block';
-        }
+        const resultadosDiv = document.getElementById('entregarResultados');
+        resultadosDiv.innerHTML = html;
         
         document.getElementById('btnBuscarClaseEntregaEjecutar').onclick = () => buscarClaseParaEntregaLista();
     }
@@ -717,14 +738,14 @@
     async function buscarClaseParaEntregaLista() {
         const curso = document.getElementById('filtroCursoEntregaClase').value;
         const grupo = document.getElementById('filtroGrupoEntregaClase').value.trim();
-        const resultadoDiv = document.getElementById('resultadoClaseEntregaLista');
+        const resultadosDiv = document.getElementById('resultadoClaseEntregaLista');
         
         if (!curso) {
-            resultadoDiv.innerHTML = '<p>Selecciona un curso</p>';
+            resultadosDiv.innerHTML = '<p>Selecciona un curso</p>';
             return;
         }
         
-        resultadoDiv.innerHTML = '<p>Buscando...</p>';
+        resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
         let query = supabase
             .from('historial_alumnos')
@@ -737,7 +758,7 @@
         const { data: alumnos } = await query;
         
         if (!alumnos || alumnos.length === 0) {
-            resultadoDiv.innerHTML = '<p>No hay alumnos en esta clase</p>';
+            resultadosDiv.innerHTML = '<p>No hay alumnos en esta clase</p>';
             return;
         }
         
@@ -745,32 +766,51 @@
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead><tr style="background:#2563eb; color:white;">
-                        <th>Alumno</th><th>Curso</th><th>Grupo</th><th>Libros</th><th>Estado</th><th>Acción</th>
+                        <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
+                        <th>Beca</th><th>Socio</th><th>Estado</th><th>Acción</th>
                     </tr></thead>
                     <tbody>`;
         
         for (const h of alumnos) {
             const alumno = h.alumnos;
-            const { count: totalPrestamos } = await supabase
+            const { count: librosPrestados } = await supabase
                 .from('prestamos')
                 .select('*', { count: 'exact', head: true })
                 .eq('alumno_id', alumno.id)
                 .eq('entregado', false);
             
-            const entregado = h.lote_entregado || false;
-            const colorFila = entregado ? 'style="background:#dcfce7;"' : '';
+            const yaEntregado = h.lote_entregado || false;
+            let estado = '';
+            let colorEstado = '';
             
-            html += `<tr ${colorFila}>
-                <td style="padding:6px;">${alumno.nombre} ${alumno.apellidos || ''}</td>
-                <td style="padding:6px;">${h.curso}</td>
-                <td style="padding:6px;">${h.grupo || ''}</td>
-                <td style="padding:6px; text-align:center;">${totalPrestamos || 0}</td>
-                <td style="padding:6px;">${entregado ? '✅ Entregado' : '⏳ Pendiente'}</td>
-                <td style="padding:6px;">${!entregado && totalPrestamos > 0 ? `<button onclick="confirmarEntregaClaseIndividual(${alumno.id}, '${alumno.nombre}')">✅ Marcar entregado</button>` : ''}</td>
-            </tr>`;
+            if (yaEntregado) {
+                estado = '✅ Lote entregado';
+                colorEstado = '#10b981';
+            } else if (librosPrestados > 0) {
+                estado = '📦 Lote preparado (pendiente)';
+                colorEstado = '#f59e0b';
+            } else {
+                estado = '❌ Sin libros asignados';
+                colorEstado = '#64748b';
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #ddd;">
+                    <td style="padding:6px;">${alumno.codigo_usuario || '-'}</td>
+                    <td style="padding:6px;">${alumno.nombre} ${alumno.apellidos || ''}</td>
+                    <td style="padding:6px;">${h.curso}</td>
+                    <td style="padding:6px;">${h.grupo || ''}</td>
+                    <td style="padding:6px; text-align:center;">${h.beca ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${h.socio_ampa ? '✅' : '❌'}</td>
+                    <td style="padding:6px; font-weight:bold; color:${colorEstado};">${estado}</td>
+                    <td style="padding:6px;">
+                        ${!yaEntregado && librosPrestados > 0 ? `<button onclick="confirmarEntregaDirecta(${alumno.id}, '${alumno.nombre}')" style="background:#10b981;">✅ Entregar lote</button>` : (yaEntregado ? '✅ Ya entregado' : '-')}
+                    </td>
+                </tr>
+            `;
         }
-        html += `</tbody></td></div>`;
-        resultadoDiv.innerHTML = html;
+        html += `</tbody></table></div>`;
+        resultadosDiv.innerHTML = html;
     }
     
     window.confirmarEntregaClaseIndividual = async (alumnoId, nombre) => {
@@ -1561,8 +1601,7 @@
                 .eq('ano_academico_id', currentAnoId);
             
             alert(`✅ Entrega confirmada para ${nombre}`);
-            // Refrescar la búsqueda
-            buscarAlumnosParaEntrega();
+            buscarAlumnosParaEntrega(); // Refrescar la lista
         }
     };
     
@@ -2771,9 +2810,6 @@
     let devolucionLibros = [];
     
     async function mostrarRecogerLote() {
-        alumnoSeleccionadoRecoger = null;
-        devolucionLibros = [];
-        
         let html = `
             <div style="margin-top:20px;">
                 <h3>📥 Recoger libros (devolución)</h3>
@@ -2792,8 +2828,10 @@
                     <button id="btnRecogerLimpiar" class="secondary">Limpiar</button>
                 </div>
                 <div id="recogerResultados" class="resultados" style="margin-top:10px;"></div>
-                <div id="recogerLoteInfo" style="margin-top:20px; display:none;">
-                    <div id="recogerDetalle"></div>
+                <div id="recogerDetallePanel" style="margin-top:20px; display:none;">
+                    <div style="border-top:1px solid #ddd; padding-top:15px;">
+                        <div id="recogerDetalleContenido"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -2806,9 +2844,7 @@
             document.getElementById('recogerCurso').value = '';
             document.getElementById('recogerCodigo').value = '';
             document.getElementById('recogerResultados').innerHTML = '';
-            document.getElementById('recogerLoteInfo').style.display = 'none';
-            alumnoSeleccionadoRecoger = null;
-            devolucionLibros = [];
+            document.getElementById('recogerDetallePanel').style.display = 'none';
         };
         
         const inputs = ['recogerNombre', 'recogerApellidos', 'recogerCurso', 'recogerCodigo'];
@@ -2844,17 +2880,28 @@
             return;
         }
         
-        let resultados = historiales.map(h => ({
-            id: h.alumnos.id,
-            nombre: h.alumnos.nombre,
-            apellidos: h.alumnos.apellidos,
-            codigo_usuario: h.alumnos.codigo_usuario,
-            curso: h.curso,
-            grupo: h.grupo,
-            beca: h.beca,
-            socio_ampa: h.socio_ampa
-        }));
+        let resultados = [];
+        for (const h of historiales) {
+            const { count: librosPrestados } = await supabase
+                .from('prestamos')
+                .select('*', { count: 'exact', head: true })
+                .eq('alumno_id', h.alumnos.id)
+                .eq('entregado', false);
+            
+            resultados.push({
+                id: h.alumnos.id,
+                nombre: h.alumnos.nombre,
+                apellidos: h.alumnos.apellidos,
+                codigo_usuario: h.alumnos.codigo_usuario,
+                curso: h.curso,
+                grupo: h.grupo,
+                beca: h.beca,
+                socio_ampa: h.socio_ampa,
+                librosPrestados: librosPrestados
+            });
+        }
         
+        // Filtrar
         if (codigoRaw) {
             resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
         }
@@ -2878,8 +2925,8 @@
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead><tr style="background:#2563eb; color:white;">
                         <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                        <th>Beca</th><th>Socio</th><th></th>
-                    </table></thead>
+                        <th>Beca</th><th>Socio</th><th>Libros pendientes</th><th></th>
+                    </tr></thead>
                     <tbody>`;
         
         for (const a of resultados) {
@@ -2892,13 +2939,138 @@
                     <td style="padding:6px;">${a.grupo || ''}</td>
                     <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
                     <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
-                    <td style="padding:6px;"><button onclick="seleccionarAlumnoRecoger(${a.id})">Seleccionar</button></td>
+                    <td style="padding:6px; text-align:center; font-weight:bold;">${a.librosPrestados}</td>
+                    <td style="padding:6px;">
+                        ${a.librosPrestados > 0 ? `<button onclick="seleccionarAlumnoRecogerDetalle(${a.id})">📖 Ver libros</button>` : '-'}
+                    </td>
                 </tr>
             `;
         }
         html += `</tbody></table></div>`;
         resultadosDiv.innerHTML = html;
     }
+    
+    let alumnoRecogerActual = null;
+    let librosRecogerActual = [];
+    
+    window.seleccionarAlumnoRecogerDetalle = async (alumnoId) => {
+        alumnoRecogerActual = alumnoId;
+        
+        const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
+        const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
+        
+        // Obtener libros prestados con todos los detalles
+        const { data: prestamos } = await supabase
+            .from('prestamos')
+            .select('*, libros(*)')
+            .eq('alumno_id', alumnoId)
+            .eq('entregado', false)
+            .eq('ano_academico_id', currentAnoId);
+        
+        librosRecogerActual = prestamos.map(p => ({
+            id: p.id,
+            codigo: p.libros.codigo_barras,
+            titulo: p.libros.titulo,
+            materia: p.libros.materia,
+            curso_para: p.libros.curso_para,
+            editorial: p.libros.editorial,
+            signatura: p.libros.signatura,
+            estado: p.libros.estado,
+            fecha_prestamo: p.fecha_prestamo,
+            devuelto: false
+        }));
+        
+        let librosHtml = `<h4>📚 Libros a devolver (${librosRecogerActual.length})</h4>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                    <thead><tr style="background:#2563eb; color:white;">
+                        <th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th>
+                        <th>Signatura</th><th>Estado</th><th>Fecha préstamo</th><th></th>
+                    </tr></thead>
+                    <tbody>`;
+        
+        for (const l of librosRecogerActual) {
+            const estadoColor = l.estado === 'desgastado' ? '#dc2626' : (l.estado === 'usado' ? '#f59e0b' : '#10b981');
+            librosHtml += `
+                <tr id="fila-libro-${l.id}" style="border-bottom:1px solid #ddd;">
+                    <td style="padding:6px;">${l.titulo}</td>
+                    <td style="padding:6px;">${l.materia || '-'}</td>
+                    <td style="padding:6px;">${l.curso_para || '-'}</td>
+                    <td style="padding:6px;">${l.editorial || '-'}</td>
+                    <td style="padding:6px;">${l.signatura || '-'}</td>
+                    <td style="padding:6px; color:${estadoColor};">${l.estado || 'nuevo'}</td>
+                    <td style="padding:6px;">${l.fecha_prestamo || '-'}</td>
+                    <td style="padding:6px;" id="td-estado-${l.id}">⏳ PENDIENTE</td>
+                </tr>
+            `;
+        }
+        librosHtml += `</tbody></table></div>`;
+        librosHtml += `<button id="btnEscanearRecogerLibro" class="success" style="margin-top:15px;">📷 Escanear libro para devolver</button>`;
+        librosHtml += `<button id="btnCerrarRecogerPanel" class="secondary" style="margin-top:15px;">✖ Cerrar</button>`;
+        
+        document.getElementById('recogerDetallePanel').style.display = 'block';
+        document.getElementById('recogerDetalleContenido').innerHTML = `
+            <div class="alumno-row" style="border-left-color:#10b981; margin-bottom:15px;">
+                <div class="alumno-info">
+                    <strong>✅ Alumno: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                    📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}
+                </div>
+            </div>
+            ${librosHtml}
+        `;
+        
+        document.getElementById('btnEscanearRecogerLibro').onclick = () => {
+            modoActual = "devolucion_libro_recoger_detalle";
+            abrirScanner();
+        };
+        document.getElementById('btnCerrarRecogerPanel').onclick = () => {
+            document.getElementById('recogerDetallePanel').style.display = 'none';
+            alumnoRecogerActual = null;
+            librosRecogerActual = [];
+            buscarAlumnosParaRecoger();
+        };
+    };
+    
+    window.procesarDevolucionRecogerDetalle = async (codigo) => {
+        if (!alumnoRecogerActual) {
+            alert("No hay alumno seleccionado");
+            return;
+        }
+        
+        const encontrado = librosRecogerActual.find(l => l.codigo === codigo);
+        
+        if (encontrado && !encontrado.devuelto) {
+            await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', encontrado.id);
+            encontrado.devuelto = true;
+            
+            // Actualizar visualmente la fila
+            const tdEstado = document.getElementById(`td-estado-${encontrado.id}`);
+            if (tdEstado) {
+                tdEstado.innerHTML = '✅ DEVUELTO';
+                tdEstado.style.color = '#10b981';
+                tdEstado.style.fontWeight = 'bold';
+            }
+            const fila = document.getElementById(`fila-libro-${encontrado.id}`);
+            if (fila) {
+                fila.style.textDecoration = 'line-through';
+                fila.style.opacity = '0.6';
+            }
+            
+            alert(`✅ Devuelto: ${encontrado.titulo}`);
+            
+            // Verificar si todos están devueltos
+            const todosDevueltos = librosRecogerActual.every(l => l.devuelto);
+            if (todosDevueltos) {
+                alert(`🎉 ¡Todos los libros de este alumno han sido devueltos!`);
+                // Refrescar el panel
+                window.seleccionarAlumnoRecogerDetalle(alumnoRecogerActual);
+            }
+        } else if (encontrado && encontrado.devuelto) {
+            alert(`⚠️ "${encontrado.titulo}" ya fue devuelto`);
+        } else {
+            alert(`⚠️ El libro escaneado no está prestado a este alumno`);
+        }
+    };
     
     window.seleccionarAlumnoRecoger = async (alumnoId) => {
         alumnoSeleccionadoRecoger = alumnoId;
@@ -3228,6 +3400,9 @@
         }
         else if (modoActual === "prestar_libro_lote_preparar") {
             await procesarLibroParaLotePreparar(codigo);
+        } 
+        else if (modoActual === "devolucion_libro_recoger_detalle") {
+            await window.procesarDevolucionRecogerDetalle(codigo);
         }            
         else if (modoActual === "escanear_libro") {
             // Escaneo para añadir nuevo libro
