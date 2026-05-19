@@ -2227,17 +2227,17 @@
             }
         }
         else if (estadoPrestamoFiltro === 'preparado') {
-            // Solo libros que están en lotes preparados (tienen préstamo pero lote NO entregado)
-            // Necesitamos los alumnos que tienen lote_entregado = false
+            // Obtener alumnos con lote_entregado = false
             const { data: alumnosLotePendiente } = await supabase
                 .from('historial_alumnos')
                 .select('alumno_id')
                 .eq('lote_entregado', false)
-                .eq('ano_academico_id', anoId);
+                .eq('ano_academico_id', currentAnoId);
             
             const alumnosIds = alumnosLotePendiente.map(a => a.alumno_id);
             
             if (alumnosIds.length > 0) {
+                // Obtener libros prestados a esos alumnos (entregado = false)
                 const { data: prestamosPreparados } = await supabase
                     .from('prestamos')
                     .select('libro_codigo')
