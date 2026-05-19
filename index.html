@@ -730,6 +730,7 @@
     // Función para buscar por clase (se mantiene pero se mejora la visualización)
     // Función para buscar por clase (misma tabla)
     async function mostrarBuscarClaseEntrega() {
+        // Mostrar los filtros de clase dentro del mismo contenedor de resultados
         let html = `
             <div style="margin-top:15px; padding:15px; background:#f8fafc; border-radius:16px;">
                 <h4>🔍 Buscar por clase</h4>
@@ -741,6 +742,7 @@
                     </select>
                     <input type="text" id="filtroGrupoEntregaClase" placeholder="Grupo (A, B, C...)" style="flex:1;">
                     <button id="btnBuscarClaseEntregaEjecutar" class="secondary">Buscar clase</button>
+                    <button id="btnVolverBusquedaNormalEntrega" class="secondary">← Volver a búsqueda normal</button>
                 </div>
                 <div id="resultadoClaseEntregaLista" style="margin-top:10px;"></div>
             </div>
@@ -750,6 +752,16 @@
         resultadosDiv.innerHTML = html;
         
         document.getElementById('btnBuscarClaseEntregaEjecutar').onclick = () => buscarClaseParaEntregaLista();
+        document.getElementById('btnVolverBusquedaNormalEntrega').onclick = () => {
+            // Volver a la búsqueda normal (limpiar y mostrar el buscador original)
+            document.getElementById('entregarNombre').value = '';
+            document.getElementById('entregarApellidos').value = '';
+            document.getElementById('entregarCurso').value = '';
+            document.getElementById('entregarCodigo').value = '';
+            document.getElementById('entregarResultados').innerHTML = '';
+            // Forzar que se pueda volver a buscar
+            buscarAlumnosParaEntrega();
+        };
     }
     
     async function buscarClaseParaEntregaLista() {
@@ -840,6 +852,7 @@
             return;
         }
         
+        // USAR LA MISMA FUNCIÓN DE VISUALIZACIÓN QUE LA BÚSQUEDA NORMAL
         mostrarTablaResultadosEntrega(resultados, resultadosDiv);
     }
     
