@@ -1800,9 +1800,10 @@
                         <div><label>Estado del libro</label><select id="filtroEstado"><option value="">Todos</option><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
                         <div><label>Origen</label><select id="filtroOrigen"><option value="">Todos</option><option>AMPA</option><option>IES</option><option>Donado</option></select></div>
                         <div><label>Estado préstamo</label><select id="filtroEstadoPrestamo">
-                            <option value="">Todos</option>
+                            <option value="">📋 Todos</option>
                             <option value="prestado">📚 Prestados</option>
                             <option value="libre">🟢 Libres (disponibles)</option>
+                            <option value="preparado">📦 Preparados (lote sin entregar)</option>
                         </select></div>
                         <div><label><input type="checkbox" id="verLibrosInactivos"> 📋 Mostrar libros dados de baja</label></div>
                     </div>
@@ -2198,11 +2199,11 @@
         console.log("Filtros aplicados:", { searchTerm, materia, curso, editorial, estado, origen });
         
         let query = supabase.from('libros').select('*');
-        // Filtrar por estado de préstamo (prestado / libre)
+        // Filtrar por estado de préstamo
         const estadoPrestamoFiltro = document.getElementById('filtroEstadoPrestamo').value;
         
         if (estadoPrestamoFiltro === 'prestado') {
-            // Solo libros que están prestados actualmente
+            // Solo libros que están prestados (lote entregado)
             const { data: prestamosActivos } = await supabase
                 .from('prestamos')
                 .select('libro_codigo')
@@ -2213,8 +2214,9 @@
             } else {
                 query = query.in('codigo_barras', ['ninguno']);
             }
-        } else if (estadoPrestamoFiltro === 'libre') {
-            // Solo libros NO prestados
+        } 
+        else if (estadoPrestamoFiltro === 'libre') {
+            // Solo libros NO prestados (disponibles)
             const { data: prestamosActivos } = await supabase
                 .from('prestamos')
                 .select('libro_codigo')
@@ -2222,6 +2224,34 @@
             const codigosPrestados = prestamosActivos.map(p => p.libro_codigo);
             if (codigosPrestados.length > 0) {
                 query = query.not('codigo_barras', 'in', `(${codigosPrestados.join(',')})`);
+            }
+        }
+        else if (estadoPrestamoFiltro === 'preparado') {
+            // Solo libros que están en lotes preparados (tienen préstamo pero lote NO entregado)
+            // Necesitamos los alumnos que tienen lote_entregado = false
+            const { data: alumnosLotePendiente } = await supabase
+                .from('historial_alumnos')
+                .select('alumno_id')
+                .eq('lote_entregado', false)
+                .eq('ano_academico_id', anoId);
+            
+            const alumnosIds = alumnosLotePendiente.map(a => a.alumno_id);
+            
+            if (alumnosIds.length > 0) {
+                const { data: prestamosPreparados } = await supabase
+                    .from('prestamos')
+                    .select('libro_codigo')
+                    .eq('entregado', false)
+                    .in('alumno_id', alumnosIds);
+                
+                const codigosPreparados = prestamosPreparados.map(p => p.libro_codigo);
+                if (codigosPreparados.length > 0) {
+                    query = query.in('codigo_barras', codigosPreparados);
+                } else {
+                    query = query.in('codigo_barras', ['ninguno']);
+                }
+            } else {
+                query = query.in('codigo_barras', ['ninguno']);
             }
         }
 
