@@ -1294,14 +1294,13 @@
         };
     }
     async function buscarAlumnosMejorado() {
-        // Obtener el año activo
-        const { data: anoActivo } = await supabaseDebug
-            .from('ano_academico')
-            .select('id')
-            .eq('activo', true)
-            .single();
+        // USAR EL AÑO SELECCIONADO EN EL SELECTOR, NO EL AÑO ACTIVO
+        const anoId = currentAnoId;
         
-        const anoId = anoActivo.id;
+        if (!anoId) {
+            console.error("No hay año seleccionado");
+            return;
+        }
         
         const nombreRaw = document.getElementById('searchNombre').value.trim();
         const apellidosRaw = document.getElementById('searchApellidos').value.trim();
@@ -1315,13 +1314,14 @@
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        // 1. Obtener historial de alumnos
+        // 1. Obtener historial de alumnos del AÑO SELECCIONADO
         let query = supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
-            .eq('ano_academico_id', anoId);
+            .eq('ano_academico_id', anoId);   // ← USAR anoId, NO año activo
         
         const { data: historiales, error } = await query;
+
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
@@ -1881,6 +1881,14 @@
 
 
     async function buscarSociosMejorado() {
+        // USAR EL AÑO SELECCIONADO EN EL SELECTOR
+        const anoId = currentAnoId;
+        
+        if (!anoId) {
+            console.error("No hay año seleccionado");
+            return;
+        }
+        
         const nombreRaw = document.getElementById('socioNombre').value.trim();
         const apellidosRaw = document.getElementById('socioApellidos').value.trim();
         const cursoFiltro = document.getElementById('socioCurso').value;
@@ -1894,13 +1902,13 @@
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        const { data: anoActivo } = await supabaseDebug.from('ano_academico').select('id').eq('activo', true).single();
-        const anoId = anoActivo.id;
-        
+        // Consultar historial del AÑO SELECCIONADO
         const { data: historiales, error } = await supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
-            .eq('ano_academico_id', anoId);
+            .eq('ano_academico_id', anoId);   // ← USAR anoId
+        
+
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
