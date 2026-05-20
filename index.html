@@ -4003,17 +4003,74 @@
     }
     
     function exportarAExcel() {
-        const tabla = document.querySelector('#resultadoListado table');
-        if (!tabla) {
+        const resultadosDiv = document.getElementById('resultadoListado');
+        if (!resultadosDiv) {
             alert('Primero genera un listado');
             return;
         }
-        const html = tabla.outerHTML;
-        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        
+        // Clonar todo el contenido del div
+        const contenido = resultadosDiv.cloneNode(true);
+        
+        // Eliminar botones y elementos interactivos
+        const botones = contenido.querySelectorAll('button, .btn, .edit-icon');
+        botones.forEach(btn => btn.remove());
+        
+        // Aplicar estilos básicos para que se vea bien en Excel
+        contenido.style.padding = '10px';
+        contenido.style.fontFamily = 'Arial, sans-serif';
+        
+        // Dar estilo a todas las tablas
+        const tablas = contenido.querySelectorAll('table');
+        tablas.forEach(tabla => {
+            tabla.style.borderCollapse = 'collapse';
+            tabla.style.width = '100%';
+            tabla.style.fontSize = '11pt';
+            tabla.style.marginBottom = '20px';
+            
+            // Estilo para celdas
+            const celdas = tabla.querySelectorAll('th, td');
+            celdas.forEach(celda => {
+                celda.style.border = '1px solid #ddd';
+                celda.style.padding = '6px';
+            });
+            
+            // Estilo para encabezados
+            const headers = tabla.querySelectorAll('th');
+            headers.forEach(th => {
+                th.style.backgroundColor = '#2563eb';
+                th.style.color = 'white';
+                th.style.fontWeight = 'bold';
+            });
+        });
+        
+        // Obtener el HTML completo con meta charset UTF-8
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Listado_${new Date().toISOString().slice(0,19)}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                </style>
+            </head>
+            <body>
+                ${contenido.innerHTML}
+            </body>
+            </html>
+        `;
+        
+        // Añadir BOM para UTF-8 (tildes y ñ)
+        const blob = new Blob(["\uFEFF" + html], { type: 'application/vnd.ms-excel' });
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'listado.xls';
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = `listado_${new Date().toISOString().slice(0,19)}.xls`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
     
     function exportarAPDF() {
