@@ -1428,7 +1428,7 @@
         const { data: anoInfo } = await supabase.from('ano_academico').select('nombre').eq('id', anoId).single();
         let html = `<h3>📅 Año académico: ${anoInfo?.nombre} - Resultados (${resultados.length})</h3>`;        
         // Mostrar resultados en tabla
-        let html = `
+        html += `
             <div style="overflow-x: auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
                     <thead><tr style="background:#2563eb; color:white; position:sticky; top:0;">
