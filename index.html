@@ -67,9 +67,10 @@
                 <select id="selectAnoAcademico"></select>
                 <span id="anoActivoBadge" style="background:#10b981; color:white; padding:4px 12px; border-radius:40px; font-size:0.8rem;">Activo</span>
             </div>
+            <button id="btnMarcarActivo" class="secondary" style="background:#10b981;">⭐ Marcar año como actual</button>
             <button id="btnPromocionarCurso" class="secondary" style="background:#8b5cf6;">🎓 Promocionar curso</button>
-            <button id="btnBackupExcel" class="success" style="background:#10b981;">💾 Copia de seguridad (Excel)</button>
-            <button id="btnRestoreSQL" class="secondary" style="background:#f59e0b;">🔄 Restaurar backup</button>
+            <button id="btnBackupExcel" class="success" style="background:#10b981;">💾 Copia (Excel)</button>
+            <button id="btnRestoreSQL" class="secondary" style="background:#f59e0b;">🔄 Restaurar </button>
         </div>
     </div>
 
@@ -165,10 +166,52 @@
         if (btnRestore) btnRestore.onclick = restaurarBackup;
         const btnPromocionar = document.getElementById('btnPromocionarCurso');
         if (btnPromocionar) btnPromocionar.onclick = mostrarPromocionCurso;
+
+        const btnMarcarActivo = document.getElementById('btnMarcarActivo');
+        if (btnMarcarActivo) btnMarcarActivo.onclick = marcarAnoActivo;        
         
         cargarTab(currentTab);
     }
-    
+    async function marcarAnoActivo() {
+        const anoId = currentAnoId;
+        if (!anoId) {
+            alert("No hay año seleccionado");
+            return;
+        }
+        
+        // Obtener el nombre del año
+        const { data: ano } = await supabase.from('ano_academico').select('nombre').eq('id', anoId).single();
+        
+        if (!confirm(`¿Marcar el año ${ano.nombre} como activo?\n\nEsto significa que al cargar la página, se seleccionará automáticamente este año.`)) return;
+        
+        // Desmarcar todos los años
+        await supabase.from('ano_academico').update({ activo: false }).neq('id', 0);
+        
+        // Marcar el seleccionado como activo
+        await supabase.from('ano_academico').update({ activo: true }).eq('id', anoId);
+        
+        // Actualizar el selector visualmente
+        const select = document.getElementById('selectAnoAcademico');
+        for (let i = 0; i < select.options.length; i++) {
+            const option = select.options[i];
+            const optionValue = parseInt(option.value);
+            if (optionValue === anoId) {
+                option.textContent = `${ano.nombre} (Activo)`;
+                option.selected = true;
+            } else {
+                // Quitar "(Activo)" de otros años
+                option.textContent = option.textContent.replace(' (Activo)', '');
+            }
+        }
+        
+        // Actualizar variable global
+        currentAnoId = anoId;
+        
+        alert(`✅ Ahora el año ${ano.nombre} es el activo.`);
+        
+        // Recargar la pestaña actual
+        cargarTab(currentTab);
+    }    
     async function cargarAnosAcademicos() {
         const { data: anos } = await supabase.from('ano_academico').select('*').order('id', { ascending: false });
         const select = document.getElementById('selectAnoAcademico');
