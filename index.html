@@ -4075,29 +4075,37 @@
             }
             
             let html = `<h3>📋 Listado general de alumnos (${alumnos.length})</h3>
-                <div style="overflow-x:auto;">
-                    <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
-                        <thead><tr style="background:#2563eb; color:white;">
-                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                            <th>Teléfono</th><th>Bilingüe</th><th>Beca</th><th>Socio AMPA</th><th>Donante</th>
+                <div style="overflow-x:auto; max-width:100%;">
+                    <table style="width:100%; border-collapse:collapse; font-size:0.7rem; min-width:800px;">
+                        <thead><tr style="background:#2563eb; color:white; position:sticky; top:0;">
+                            <th style="padding:6px;">Código</th>
+                            <th style="padding:6px;">Nombre</th>
+                            <th style="padding:6px;">Apellidos</th>
+                            <th style="padding:6px;">Curso</th>
+                            <th style="padding:6px;">Grupo</th>
+                            <th style="padding:6px;">Teléfono</th>
+                            <th style="padding:6px;">Bilingüe</th>
+                            <th style="padding:6px;">Beca</th>
+                            <th style="padding:6px;">Socio</th>
+                            <th style="padding:6px;">Donante</th>
                         </tr></thead>
                         <tbody>`;
             
             for (const a of alumnos) {
-                html += `<tr>
-                    <td>${a.alumnos.codigo_usuario || '-'}</td>
-                    <td>${a.alumnos.nombre || ''}</td>
-                    <td>${a.alumnos.apellidos || ''}</td>
-                    <td>${a.curso || '-'}</td>
-                    <td>${a.grupo || '-'}</td>
-                    <td>${a.telefono || '-'}</td>
-                    <td style="text-align:center">${a.bilingue ? '✅' : '❌'}</td>
-                    <td style="text-align:center">${a.beca ? '✅' : '❌'}</td>
-                    <td style="text-align:center">${a.socio_ampa ? '✅' : '❌'}</td>
-                    <td style="text-align:center">${a.donante ? '✅' : '❌'}</td>
-                </table>`;
+                html += `<tr style="border-bottom:1px solid #ddd;">
+                    <td style="padding:6px;">${a.alumnos.codigo_usuario || '-'}</td>
+                    <td style="padding:6px;">${a.alumnos.nombre || ''}</td>
+                    <td style="padding:6px;">${a.alumnos.apellidos || ''}</td>
+                    <td style="padding:6px;">${a.curso || '-'}</td>
+                    <td style="padding:6px;">${a.grupo || '-'}</td>
+                    <td style="padding:6px;">${a.telefono || '-'}</td>
+                    <td style="padding:6px; text-align:center;">${a.bilingue ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${a.donante ? '✅' : '❌'}</td>
+                </tr>`;
             }
-            html += `</tbody></tr></div>`;
+            html += `</tbody></table></div>`;
             resultadosDiv.innerHTML = html;
             return;
         }
