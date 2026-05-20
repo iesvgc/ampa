@@ -89,6 +89,55 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
     
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ==================== MATERIAS PREDEFINIDAS ====================
+    const materiasPredefinidas = [
+        { codigo: '01', nombre: 'Lengua y Literatura' },
+        { codigo: '02', nombre: 'Matemáticas' },
+        { codigo: '03', nombre: 'Geografia e Historia' },
+        { codigo: '04', nombre: 'Biología y geología' },
+        { codigo: '05', nombre: 'Matemáticas Aplicadas (A)' },
+        { codigo: '06', nombre: 'Matemáticas Académicas (B)' },
+        { codigo: '07', nombre: 'Física y química' },
+        { codigo: '08', nombre: 'Asturiano' },
+        { codigo: '09', nombre: 'Inglés Bilingüe' },
+        { codigo: '10', nombre: 'Música' },
+        { codigo: '11', nombre: 'Inglés No Bilingüe' },
+        { codigo: '12', nombre: 'Francés' },
+        { codigo: '13', nombre: 'Economía, Emprendimiento y Actividad Empresarial' },
+        { codigo: '14', nombre: 'Cultura Científica' },
+        { codigo: '15', nombre: 'Cultura clásica' },
+        { codigo: '16', nombre: 'Geografia e Historia Bilingüe' },
+        { codigo: '19', nombre: 'Ámbito Científico Matemático' },
+        { codigo: '20', nombre: 'Latín' },
+        { codigo: '21', nombre: 'Historia de la Filosofía' },
+        { codigo: '22', nombre: 'Economía' },
+        { codigo: '23', nombre: 'Ámbito Científico Tecnológico' },
+        { codigo: '24', nombre: 'Ámbito Lingüístico y Social' },
+        { codigo: '26', nombre: 'Formación y Orientación Profesional' },
+        { codigo: '27', nombre: 'Educación en valores cívicos y éticos' },
+        { codigo: '28', nombre: 'Biología, geología y CC. AA.' },
+        { codigo: '29', nombre: 'Dibujo técnico' },
+        { codigo: '30', nombre: 'Historia del Mundo Contemporáneo' },
+        { codigo: '31', nombre: 'Matemáticas I' },
+        { codigo: '32', nombre: 'Matemáticas Generales' },
+        { codigo: '33', nombre: 'Filosofía' },
+        { codigo: '34', nombre: 'Química' },
+        { codigo: '35', nombre: 'Física' },
+        { codigo: '36', nombre: 'Geología y CC.AA.' },
+        { codigo: '37', nombre: 'Geografia' },
+        { codigo: '38', nombre: 'Dibujo técnico II' },
+        { codigo: '39', nombre: 'Empresa y Diseño de Modelos de Negocio' }
+    ];
+    
+    // Códigos de curso
+    const codigosCurso = {
+        '1ESO': '01',
+        '2ESO': '02',
+        '3ESO': '03',
+        '4ESO': '04',
+        '1BAC': '05',
+        '2BAC': '06'
+    };
     
     let html5QrCode = null;
     let currentTab = 'alumnos';
@@ -1839,27 +1888,33 @@
             return;
         }
         
-        // Obtener listas de materias, editoriales y años existentes
-        const { data: materiasBD } = await supabaseDebug.from('libros').select('materia').not('materia', 'is', null);
+        // Obtener listas de editoriales existentes (materias ya no hace falta, usamos predefinidas)
         const { data: editorialesBD } = await supabaseDebug.from('libros').select('editorial').not('editorial', 'is', null);
-        
-        const materias = [...new Set(materiasBD.map(m => m.materia))];
         const editoriales = [...new Set(editorialesBD.map(e => e.editorial))];
-        const años = ['2020', '2021', '2022', '2023', '2024', '2025', '2026'];
         
         let html = `
             <div class="card">
                 <h2>📖 Nuevo Libro</h2>
                 <p>Código escaneado: <strong>${codigo}</strong></p>
                 <div class="form-grid">
+                    <div><label>Curso *</label>
+                        <select id="nuevoCurso">
+                            <option value="">Selecciona curso</option>
+                            <option value="1ESO">1ESO</option><option value="2ESO">2ESO</option>
+                            <option value="3ESO">3ESO</option><option value="4ESO">4ESO</option>
+                            <option value="1BAC">1BAC</option><option value="2BAC">2BAC</option>
+                        </select>
+                    </div>
+                    
                     <div><label>Materia *</label>
                         <select id="nuevoMateria">
-                            <option value="">Selecciona o escribe...</option>
-                            ${materias.map(m => `<option value="${m}">${m}</option>`).join('')}
+                            <option value="">Selecciona materia</option>
+                            ${materiasPredefinidas.map(m => `<option value="${m.nombre}" data-codigo="${m.codigo}">${m.nombre}</option>`).join('')}
                         </select>
                         <input type="text" id="nuevaMateriaInput" placeholder="O escribe una nueva materia" style="margin-top:5px;">
+                        <small style="color:#64748b; display:block; margin-top:5px;">📌 Si el libro está dividido en trimestres, escribe la materia seguida del número de trimestre. Ejemplo: Matemáticas 2</small>
                     </div>
-                    <small style="color:#64748b; display:block; margin-top:5px;">📌 Si el libro está dividido en trimestres, escribe la materia seguida del número de trimestre. Ejemplo: Matemáticas 2</small>                    
+                    
                     <div><label>Editorial</label>
                         <select id="nuevoEditorial">
                             <option value="">Selecciona o escribe...</option>
@@ -1867,15 +1922,11 @@
                         </select>
                         <input type="text" id="nuevaEditorialInput" placeholder="O escribe una nueva editorial" style="margin-top:5px;">
                     </div>
+                    
                     <div><label>Incidencia</label>
                         <input type="text" id="nuevaIncidencia" placeholder="Sin incidencias" disabled style="background:#f0f0f0;">
                         <small style="color:#64748b;">📌 Las incidencias solo pueden editarse después de crear el libro</small>
-                    </div>                    
-                    <div><label>Curso *</label><select id="nuevoCurso">
-                        <option value="">Selecciona</option>
-                        <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
-                        <option>1BAC</option><option>2BAC</option>
-                    </select></div>
+                    </div>
                     
                     <div><label>Estado</label><select id="nuevoEstado">
                         <option>nuevo</option><option>usado</option><option>desgastado</option>
@@ -1904,13 +1955,13 @@
                     
                     <div><label>Signatura</label>
                         <div style="display: flex; gap: 8px; align-items: center;">
-                            <input type="text" id="sig1" placeholder="XX" maxlength="2" style="width:70px;">
+                            <input type="text" id="sigCurso" placeholder="Curso" readonly style="width:70px; background:#f0f0f0;">
                             <span>-</span>
-                            <input type="text" id="sig2" placeholder="XX" maxlength="2" style="width:70px;">
+                            <input type="text" id="sigMateria" placeholder="Materia" readonly style="width:70px; background:#f0f0f0;">
                             <span>-</span>
-                            <input type="text" id="sig3" placeholder="XXX" maxlength="3" style="width:90px;">
+                            <input type="text" id="sigEjemplar" placeholder="XXX" maxlength="3" style="width:90px;">
                         </div>
-                        <small style="color:#64748b;">📌 Formato: Código curso - Código de libro - Nº ejemplar</small>
+                        <small style="color:#64748b;">📌 Formato: Curso - Materia - Nº ejemplar (automático excepto el número)</small>
                     </div>
                 </div>
                 <div class="flex"><button id="guardarNuevoLibroBtn">💾 Guardar libro</button>
@@ -1919,6 +1970,38 @@
         `;
         
         document.getElementById('mainPanel').innerHTML = html;
+        
+        // Función para actualizar la signatura en tiempo real
+        function actualizarSignatura() {
+            const curso = document.getElementById('nuevoCurso').value;
+            const materiaSelect = document.getElementById('nuevoMateria');
+            const materiaTexto = materiaSelect.value;
+            const materiaInput = document.getElementById('nuevaMateriaInput').value;
+            const materiaFinal = materiaInput || materiaTexto;
+            
+            const codigoCurso = codigosCurso[curso] || '';
+            let codigoMateria = '';
+            
+            if (materiaFinal) {
+                const materiaEncontrada = materiasPredefinidas.find(m => m.nombre === materiaFinal);
+                if (materiaEncontrada) {
+                    codigoMateria = materiaEncontrada.codigo;
+                } else {
+                    // Si es una materia nueva, usar el siguiente código (40 en adelante)
+                    const ultimoCodigo = materiasPredefinidas[materiasPredefinidas.length - 1].codigo;
+                    const siguienteNumero = parseInt(ultimoCodigo) + 1;
+                    codigoMateria = siguienteNumero.toString().padStart(2, '0');
+                }
+            }
+            
+            document.getElementById('sigCurso').value = codigoCurso;
+            document.getElementById('sigMateria').value = codigoMateria;
+        }
+        
+        // Eventos para actualizar signatura
+        document.getElementById('nuevoCurso').addEventListener('change', actualizarSignatura);
+        document.getElementById('nuevoMateria').addEventListener('change', actualizarSignatura);
+        document.getElementById('nuevaMateriaInput').addEventListener('input', actualizarSignatura);
         
         // Mostrar/ocultar buscador de donante según origen
         document.getElementById('nuevoOrigen').addEventListener('change', function() {
@@ -1980,18 +2063,7 @@
             document.getElementById('resultadoDonante').innerHTML = `<p>✅ Donante seleccionado: ${texto}</p>`;
         };
         
-        // Añadir nuevas opciones
-        document.getElementById('nuevaMateriaInput').addEventListener('change', function() {
-            if(this.value) {
-                const select = document.getElementById('nuevoMateria');
-                const option = document.createElement('option');
-                option.value = this.value;
-                option.text = this.value + " (nueva)";
-                select.appendChild(option);
-                select.value = this.value;
-            }
-        });
-        
+        // Añadir nuevas editoriales
         document.getElementById('nuevaEditorialInput').addEventListener('change', function() {
             if(this.value) {
                 const select = document.getElementById('nuevoEditorial');
@@ -2004,25 +2076,40 @@
         });
         
         document.getElementById('guardarNuevoLibroBtn').onclick = async () => {
+            const curso = document.getElementById('nuevoCurso').value;
             const materia = document.getElementById('nuevoMateria').value || document.getElementById('nuevaMateriaInput').value;
             const editorial = document.getElementById('nuevoEditorial').value || document.getElementById('nuevaEditorialInput').value;
-            const curso = document.getElementById('nuevoCurso').value;
             const estado = document.getElementById('nuevoEstado').value;
             const origen = document.getElementById('nuevoOrigen').value;
             const anio = document.getElementById('nuevoAnio').value;
-            const sig1 = document.getElementById('sig1').value;
-            const sig2 = document.getElementById('sig2').value;
-            const sig3 = document.getElementById('sig3').value;
+            const sigEjemplar = document.getElementById('sigEjemplar').value;
             const donanteId = document.getElementById('donanteId').value;
             
-            if (!materia || !curso) {
-                alert('Materia y curso son obligatorios');
+            const codigoCurso = codigosCurso[curso] || '';
+            let codigoMateria = '';
+            
+            if (materia) {
+                const materiaEncontrada = materiasPredefinidas.find(m => m.nombre === materia);
+                if (materiaEncontrada) {
+                    codigoMateria = materiaEncontrada.codigo;
+                } else {
+                    const ultimoCodigo = materiasPredefinidas[materiasPredefinidas.length - 1].codigo;
+                    const siguienteNumero = parseInt(ultimoCodigo) + 1;
+                    codigoMateria = siguienteNumero.toString().padStart(2, '0');
+                }
+            }
+            
+            if (!curso || !materia) {
+                alert('Curso y materia son obligatorios');
                 return;
             }
             
-            const signatura = sig1 && sig2 && sig3 ? `${sig1}-${sig2}-${sig3}` : null;
+            if (!sigEjemplar) {
+                alert('Debes escribir el número de ejemplar');
+                return;
+            }
             
-            // Generar título automático: Materia + Curso
+            const signatura = `${codigoCurso}-${codigoMateria}-${sigEjemplar.padStart(3, '0')}`;
             const titulo = `${materia} ${curso}`;
             
             const libroData = {
@@ -2034,7 +2121,7 @@
                 estado: estado,
                 origen: origen,
                 incidencia: null,
-                fecha_compra: anio || null,  // Guarda solo el año como texto, no como fecha
+                fecha_compra: anio || null,
                 signatura: signatura,
                 donante_id: origen === 'Donado' && donanteId ? parseInt(donanteId) : null
             };
@@ -2044,49 +2131,17 @@
             if (error) {
                 alert('Error: ' + error.message);
             } else {
-                // Si el libro es donado y hay donante, actualizar el historial del alumno
                 if (origen === 'Donado' && donanteId) {
-                    // Obtener el año activo directamente desde la BD
-                    const { data: anoActivo } = await supabaseDebug
-                        .from('ano_academico')
-                        .select('id')
-                        .eq('activo', true)
-                        .single();
+                    const { data: anoActivo } = await supabaseDebug.from('ano_academico').select('id').eq('activo', true).single();
                     const añoId = anoActivo.id;
-                    
-                    const { data: historial } = await supabaseDebug
-                        .from('historial_alumnos')
-                        .select('donante, libros_donados')
-                        .eq('alumno_id', donanteId)
-                        .eq('ano_academico_id', añoId)
-                        .maybeSingle();
-                    
+                    const { data: historial } = await supabaseDebug.from('historial_alumnos').select('donante, libros_donados').eq('alumno_id', donanteId).eq('ano_academico_id', añoId).maybeSingle();
                     if (historial) {
-                        await supabaseDebug
-                            .from('historial_alumnos')
-                            .update({ 
-                                donante: true, 
-                                libros_donados: (historial.libros_donados || 0) + 1,
-                                fecha_donacion: new Date().toISOString().slice(0,10)
-                            })
-                            .eq('alumno_id', donanteId)
-                            .eq('ano_academico_id', añoId);
+                        await supabaseDebug.from('historial_alumnos').update({ donante: true, libros_donados: (historial.libros_donados || 0) + 1, fecha_donacion: new Date().toISOString().slice(0,10) }).eq('alumno_id', donanteId).eq('ano_academico_id', añoId);
                     } else {
-                        await supabaseDebug
-                            .from('historial_alumnos')
-                            .insert({
-                                alumno_id: donanteId,
-                                ano_academico_id: añoId,
-                                donante: true,
-                                libros_donados: 1,
-                                fecha_donacion: new Date().toISOString().slice(0,10),
-                                activo: true
-                            });
-
+                        await supabaseDebug.from('historial_alumnos').insert({ alumno_id: donanteId, ano_academico_id: añoId, donante: true, libros_donados: 1, fecha_donacion: new Date().toISOString().slice(0,10), activo: true });
                     }
                 }
-                
-                alert(`✅ Libro "${titulo}" añadido correctamente`);
+                alert(`✅ Libro "${titulo}" añadido correctamente\nSignatura: ${signatura}`);
                 cargarBiblioteca();
             }
         };
