@@ -2687,43 +2687,29 @@
         // 2. Obtener TODOS los préstamos activos de una vez
         const { data: todosPrestamos } = await supabaseDebug
             .from('prestamos')
-            .select('alumno_id, id, entregado, libros(*)')
+            .select('alumno_id, id')
             .eq('entregado', false)
             .eq('ano_academico_id', anoId);
         
-        // 3. Obtener TODOS los estados de entrega de una vez
-        const { data: todosEntregas } = await supabaseDebug
-            .from('historial_alumnos')
-            .select('alumno_id, lote_entregado')
-            .eq('ano_academico_id', anoId);
-        
-        // Crear mapas
-        const prestamosPorAlumno = {};
+        const prestamosCount = {};
         for (const p of todosPrestamos || []) {
-            if (!prestamosPorAlumno[p.alumno_id]) prestamosPorAlumno[p.alumno_id] = [];
-            prestamosPorAlumno[p.alumno_id].push(p);
-        }
-        
-        const entregaPorAlumno = {};
-        for (const e of todosEntregas || []) {
-            entregaPorAlumno[e.alumno_id] = e.lote_entregado || false;
+            prestamosCount[p.alumno_id] = (prestamosCount[p.alumno_id] || 0) + 1;
         }
         
         let resultados = [];
         for (const h of historiales) {
-            const prestamos = prestamosPorAlumno[h.alumnos.id] || [];
-            const tieneLibros = prestamos.length > 0;
-            const loteEntregado = entregaPorAlumno[h.alumnos.id] || false;
+            const librosPrestados = prestamosCount[h.alumnos.id] || 0;
+            const yaEntregado = h.lote_entregado || false;
             
             let estado = '';
             let colorEstado = '';
             
-            if (tieneLibros && !loteEntregado) {
-                estado = '📦 LOTE PREPARADO (pendiente recoger)';
-                colorEstado = '#f59e0b';
-            } else if (tieneLibros && loteEntregado) {
-                estado = '📚 LIBROS PRESTADOS';
+            if (yaEntregado) {
+                estado = '✅ Lote entregado';
                 colorEstado = '#10b981';
+            } else if (librosPrestados > 0) {
+                estado = '📦 Lote preparado (pendiente)';
+                colorEstado = '#f59e0b';
             } else {
                 estado = '❌ Sin libros asignados';
                 colorEstado = '#64748b';
@@ -2738,15 +2724,14 @@
                 grupo: h.grupo,
                 beca: h.beca,
                 socio_ampa: h.socio_ampa,
+                librosPrestados: librosPrestados,
+                yaEntregado: yaEntregado,
                 estado: estado,
-                colorEstado: colorEstado,
-                tieneLibros: tieneLibros,
-                loteEntregado: loteEntregado,
-                libros: prestamos
+                colorEstado: colorEstado
             });
         }
         
-        // Filtrar adicionalmente por nombre y código
+        // Filtrar adicionalmente
         if (codigoRaw) {
             resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
         }
@@ -2762,15 +2747,25 @@
             return;
         }
         
-        // Mostrar resultados en tabla
-        let html = `<h3>Selecciona un alumno (${resultados.length} resultados)</h3>
+        // Usar la misma función de visualización que en Entregar lote
+        mostrarTablaResultadosPreparar(resultados, resultadosDiv);
+    }
+    
+    function mostrarTablaResultadosPreparar(resultados, resultadosDiv) {
+        let html = `<h3>Resultados (${resultados.length})</h3>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem; min-width:800px;">
                     <thead><tr style="background:#2563eb; color:white;">
-                        <th style="padding:6px;">Código</th><th style="padding:6px;">Nombre</th><th style="padding:6px;">Apellidos</th>
-                        <th style="padding:6px;">Curso</th><th style="padding:6px;">Grupo</th>
-                        <th style="padding:6px;">Beca</th><th style="padding:6px;">Socio</th>
-                        <th style="padding:6px;">Estado</th><th style="padding:6px;"></th>
+                        <th style="padding:6px;">Código</th>
+                        <th style="padding:6px;">Nombre</th>
+                        <th style="padding:6px;">Apellidos</th>
+                        <th style="padding:6px;">Curso</th>
+                        <th style="padding:6px;">Grupo</th>
+                        <th style="padding:6px;">Beca</th>
+                        <th style="padding:6px;">Socio</th>
+                        <th style="padding:6px;">Libros</th>
+                        <th style="padding:6px;">Estado</th>
+                        <th style="padding:6px;">Acción</th>
                     </tr></thead>
                     <tbody>`;
         
@@ -2784,9 +2779,12 @@
                     <td style="padding:6px;">${a.grupo || ''}</td>
                     <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
                     <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${a.librosPrestados}</td>
                     <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
-                    <td style="padding:6px;"><button onclick="seleccionarAlumnoPrepararConEstado(${a.id})">Seleccionar</button></td>
-                </table>
+                    <td style="padding:6px;">
+                        ${!a.yaEntregado && a.librosPrestados > 0 ? `<button onclick="seleccionarAlumnoPrepararConEstado(${a.id})" style="background:#10b981;">📦 Preparar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}
+                    </td>
+                </tr>
             `;
         }
         html += `</tbody></table></div>`;
