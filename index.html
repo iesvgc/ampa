@@ -371,12 +371,9 @@
             const baja = fila.querySelector('.baja-checkbox')?.checked;
             const yaPromocionado = fila.querySelector('.curso-destino')?.disabled;
             
-            // Saltar si ya estaba promocionado o si está marcado como baja
             if (yaPromocionado || baja) continue;
-            
             if (!cursoDestino) continue;
             
-            // Obtener los datos del alumno desde el historial origen
             const { data: origen } = await supabase
                 .from('historial_alumnos')
                 .select('*')
@@ -385,16 +382,15 @@
             
             if (!origen) continue;
             
-            // Crear nuevo registro en historial para el año destino
             const nuevoHistorial = {
                 alumno_id: alumnoId,
                 ano_academico_id: anoDestinoId,
                 curso: cursoDestino,
                 grupo: grupoDestino || '',
                 telefono: origen.telefono || '',
-                bilingue: false,      // Resetear
-                beca: false,          // Resetear
-                socio_ampa: false,    // Resetear
+                bilingue: false,
+                beca: false,
+                socio_ampa: false,
                 diversificacion: origen.diversificacion || false,
                 donante: origen.donante || false,
                 observaciones: origen.observaciones || '',
@@ -409,7 +405,6 @@
                 errores++;
             } else {
                 creados++;
-                // Marcar fila como procesada
                 fila.style.backgroundColor = '#dcfce7';
                 const tdEstado = fila.querySelector('td:last-child');
                 if (tdEstado) tdEstado.innerHTML = '✅ Promocionado';
@@ -418,12 +413,28 @@
         
         alert(`✅ Promoción completada: ${creados} alumnos promocionados.\n❌ Errores: ${errores}`);
         
-        // Recargar la lista para mostrar actualización
-        const curso = document.getElementById('promocionCursoOrigen').value;
-        const grupo = document.getElementById('promocionGrupoOrigen').value;
-        const anoOrigenId = (await supabase.from('ano_academico').select('id').eq('activo', true).single()).data.id;
-        cargarAlumnosParaPromocion(anoOrigenId, anoDestinoId);
-    }    
+        if (creados > 0) {
+            // Cambiar selector al nuevo año automáticamente
+            const select = document.getElementById('selectAnoAcademico');
+            for (let i = 0; i < select.options.length; i++) {
+                if (parseInt(select.options[i].value) === anoDestinoId) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+            // Disparar evento change para que se actualice currentAnoId
+            const event = new Event('change');
+            select.dispatchEvent(event);
+            
+            // Cerrar modal
+            document.getElementById('modalPromocion')?.remove();
+            
+            alert(`🔄 Año cambiado automáticamente al nuevo curso. Ahora puedes buscar alumnos promocionados.`);
+            
+            // Recargar la pestaña actual para mostrar datos del nuevo año
+            cargarTab(currentTab);
+        }
+    }
     function setupEventListeners() {
         document.querySelectorAll('.nav-tab').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1414,7 +1425,8 @@
             }
             return;
         }
-        
+        const { data: anoInfo } = await supabase.from('ano_academico').select('nombre').eq('id', anoId).single();
+        let html = `<h3>📅 Año académico: ${anoInfo?.nombre} - Resultados (${resultados.length})</h3>`;        
         // Mostrar resultados en tabla
         let html = `
             <div style="overflow-x: auto;">
