@@ -57,12 +57,17 @@
 </head>
 <body>
 <div class="container">
+
     <div class="top-bar">
         <h1 style="margin:0">📚 Banco de Libros</h1>
-        <div class="year-selector">
-            <span>📅 Año Académico:</span>
-            <select id="selectAnoAcademico"></select>
-            <span id="anoActivoBadge" style="background:#10b981; color:white; padding:4px 12px; border-radius:40px; font-size:0.8rem;">Activo</span>
+        <div class="flex">
+            <div class="year-selector">
+                <span>📅 Año Académico:</span>
+                <select id="selectAnoAcademico"></select>
+                <span id="anoActivoBadge" style="background:#10b981; color:white; padding:4px 12px; border-radius:40px; font-size:0.8rem;">Activo</span>
+            </div>
+            <button id="btnBackupExcel" class="success" style="background:#10b981;">💾 Copia de seguridad (Excel)</button>
+            <button id="btnRestoreSQL" class="secondary" style="background:#f59e0b;">🔄 Restaurar backup</button>
         </div>
     </div>
 
@@ -150,6 +155,14 @@
     async function init() {
         await cargarAnosAcademicos();
         setupEventListeners();
+        // Botones de backup y restauración
+        const btnBackup = document.getElementById('btnBackupExcel');
+        if (btnBackup) btnBackup.onclick = descargarBackupExcel;
+        
+        const btnRestore = document.getElementById('btnRestoreSQL');
+        if (btnRestore) btnRestore.onclick = restaurarBackup;
+
+        
         cargarTab(currentTab);
     }
     
@@ -4879,7 +4892,268 @@
         }
         container.innerHTML = html;
     }
+    // ==================== COPIA DE SEGURIDAD COMPLETA ====================
+    async function descargarBackupExcel() {
+        const loadingMsg = document.createElement('div');
+        loadingMsg.innerHTML = '<div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px; border-radius:12px; z-index:10000;">📥 Generando copia de seguridad...<br>Por favor, espera.</div>';
+        document.body.appendChild(loadingMsg);
+        
+        try {
+            // Obtener todos los datos
+            const [alumnos, libros, prestamos, socios, historial] = await Promise.all([
+                supabase.from('alumnos').select('*').order('id'),
+                supabase.from('libros').select('*').order('titulo'),
+                supabase.from('prestamos').select('*, alumnos(nombre, apellidos), libros(titulo, materia)').order('id'),
+                supabase.from('socios').select('*, alumnos(nombre, apellidos)').order('id'),
+                supabase.from('historial_alumnos').select('*, alumnos(nombre, apellidos)').order('id')
+            ]);
+            
+            // Crear un libro de Excel con múltiples hojas usando SheetJS
+            // Para ello, primero necesitamos cargar la librería SheetJS
+            if (typeof XLSX === 'undefined') {
+                await cargarSheetJS();
+            }
+            
+            const wb = XLSX.utils.book_new();
+            
+            // Hoja 1: Alumnos
+            if (alumnos.data && alumnos.data.length > 0) {
+                const wsAlumnos = XLSX.utils.json_to_sheet(alumnos.data);
+                XLSX.utils.book_append_sheet(wb, wsAlumnos, 'Alumnos');
+            }
+            
+            // Hoja 2: Libros
+            if (libros.data && libros.data.length > 0) {
+                const wsLibros = XLSX.utils.json_to_sheet(libros.data);
+                XLSX.utils.book_append_sheet(wb, wsLibros, 'Libros');
+            }
+            
+            // Hoja 3: Préstamos
+            if (prestamos.data && prestamos.data.length > 0) {
+                const prestamosFormateados = prestamos.data.map(p => ({
+                    id: p.id,
+                    libro_codigo: p.libro_codigo,
+                    libro_titulo: p.libros?.titulo,
+                    alumno_id: p.alumno_id,
+                    alumno_nombre: p.alumnos?.nombre,
+                    alumno_apellidos: p.alumnos?.apellidos,
+                    fecha_prestamo: p.fecha_prestamo,
+                    fecha_devolucion: p.fecha_devolucion,
+                    entregado: p.entregado,
+                    ano_academico_id: p.ano_academico_id,
+                    notas: p.notas
+                }));
+                const wsPrestamos = XLSX.utils.json_to_sheet(prestamosFormateados);
+                XLSX.utils.book_append_sheet(wb, wsPrestamos, 'Préstamos');
+            }
+            
+            // Hoja 4: Socios
+            if (socios.data && socios.data.length > 0) {
+                const sociosFormateados = socios.data.map(s => ({
+                    id: s.id,
+                    n_socio: s.n_socio,
+                    alumno_id: s.alumno_id,
+                    alumno_nombre: s.alumnos?.nombre,
+                    alumno_apellidos: s.alumnos?.apellidos,
+                    ano_academico_id: s.ano_academico_id,
+                    fecha_pago: s.fecha_pago,
+                    pagado: s.pagado,
+                    activo: s.activo
+                }));
+                const wsSocios = XLSX.utils.json_to_sheet(sociosFormateados);
+                XLSX.utils.book_append_sheet(wb, wsSocios, 'Socios');
+            }
+            
+            // Hoja 5: Historial Alumnos
+            if (historial.data && historial.data.length > 0) {
+                const historialFormateado = historial.data.map(h => ({
+                    id: h.id,
+                    alumno_id: h.alumno_id,
+                    alumno_nombre: h.alumnos?.nombre,
+                    alumno_apellidos: h.alumnos?.apellidos,
+                    ano_academico_id: h.ano_academico_id,
+                    curso: h.curso,
+                    grupo: h.grupo,
+                    telefono: h.telefono,
+                    bilingue: h.bilingue,
+                    beca: h.beca,
+                    socio_ampa: h.socio_ampa,
+                    diversificacion: h.diversificacion,
+                    donante: h.donante,
+                    observaciones: h.observaciones,
+                    lote_entregado: h.lote_entregado,
+                    fecha_entrega: h.fecha_entrega,
+                    activo: h.activo
+                }));
+                const wsHistorial = XLSX.utils.json_to_sheet(historialFormateado);
+                XLSX.utils.book_append_sheet(wb, wsHistorial, 'Historial_Alumnos');
+            }
+            
+            // Exportar archivo
+            const fecha = new Date().toISOString().slice(0,19).replace(/:/g, '-');
+            XLSX.writeFile(wb, `backup_biblioteca_${fecha}.xlsx`);
+            
+        } catch (error) {
+            console.error('Error al generar backup:', error);
+            alert('Error al generar la copia de seguridad: ' + error.message);
+        } finally {
+            if (loadingMsg) loadingMsg.remove();
+        }
+    }
     
+    function cargarSheetJS() {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+    
+    // ==================== RESTAURAR BACKUP ====================
+    async function restaurarBackup() {
+        // Crear input de archivo oculto
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.xlsx, .xls, .csv, .json';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (!confirm('⚠️ ADVERTENCIA: Restaurar un backup SOBRESCRIBIRÁ los datos actuales.\n\n¿Estás seguro de que quieres continuar?')) return;
+            
+            const loadingMsg = document.createElement('div');
+            loadingMsg.innerHTML = '<div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px; border-radius:12px; z-index:10000;">🔄 Restaurando datos...<br>Por favor, espera.</div>';
+            document.body.appendChild(loadingMsg);
+            
+            try {
+                if (typeof XLSX === 'undefined') await cargarSheetJS();
+                
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+                
+                // Procesar cada hoja
+                const sheets = {
+                    Alumnos: workbook.Sheets['Alumnos'],
+                    Libros: workbook.Sheets['Libros'],
+                    Préstamos: workbook.Sheets['Préstamos'],
+                    Socios: workbook.Sheets['Socios'],
+                    Historial_Alumnos: workbook.Sheets['Historial_Alumnos']
+                };
+                
+                // Verificar que al menos hay una hoja válida
+                if (!sheets.Alumnos && !sheets.Libros) {
+                    alert('El archivo no contiene datos válidos para restaurar');
+                    loadingMsg.remove();
+                    return;
+                }
+                
+                // Restaurar Alumnos
+                if (sheets.Alumnos) {
+                    const alumnos = XLSX.utils.sheet_to_json(sheets.Alumnos);
+                    if (alumnos.length > 0) {
+                        await supabase.from('alumnos').delete().neq('id', 0);
+                        for (const alumno of alumnos) {
+                            await supabase.from('alumnos').insert(alumno);
+                        }
+                        console.log(`✅ Restaurados ${alumnos.length} alumnos`);
+                    }
+                }
+                
+                // Restaurar Libros
+                if (sheets.Libros) {
+                    const libros = XLSX.utils.sheet_to_json(sheets.Libros);
+                    if (libros.length > 0) {
+                        await supabase.from('libros').delete().neq('codigo_barras', '');
+                        for (const libro of libros) {
+                            await supabase.from('libros').insert(libro);
+                        }
+                        console.log(`✅ Restaurados ${libros.length} libros`);
+                    }
+                }
+                
+                // Restaurar Préstamos
+                if (sheets.Préstamos) {
+                    const prestamos = XLSX.utils.sheet_to_json(sheets.Préstamos);
+                    if (prestamos.length > 0) {
+                        await supabase.from('prestamos').delete().neq('id', 0);
+                        for (const prestamo of prestamos) {
+                            await supabase.from('prestamos').insert({
+                                id: prestamo.id,
+                                libro_codigo: prestamo.libro_codigo,
+                                alumno_id: prestamo.alumno_id,
+                                fecha_prestamo: prestamo.fecha_prestamo,
+                                fecha_devolucion: prestamo.fecha_devolucion,
+                                entregado: prestamo.entregado,
+                                ano_academico_id: prestamo.ano_academico_id,
+                                notas: prestamo.notas
+                            });
+                        }
+                        console.log(`✅ Restaurados ${prestamos.length} préstamos`);
+                    }
+                }
+                
+                // Restaurar Socios
+                if (sheets.Socios) {
+                    const socios = XLSX.utils.sheet_to_json(sheets.Socios);
+                    if (socios.length > 0) {
+                        await supabase.from('socios').delete().neq('id', 0);
+                        for (const socio of socios) {
+                            await supabase.from('socios').insert({
+                                id: socio.id,
+                                n_socio: socio.n_socio,
+                                alumno_id: socio.alumno_id,
+                                ano_academico_id: socio.ano_academico_id,
+                                fecha_pago: socio.fecha_pago,
+                                pagado: socio.pagado,
+                                activo: socio.activo
+                            });
+                        }
+                        console.log(`✅ Restaurados ${socios.length} socios`);
+                    }
+                }
+                
+                // Restaurar Historial Alumnos
+                if (sheets.Historial_Alumnos) {
+                    const historiales = XLSX.utils.sheet_to_json(sheets.Historial_Alumnos);
+                    if (historiales.length > 0) {
+                        await supabase.from('historial_alumnos').delete().neq('id', 0);
+                        for (const h of historiales) {
+                            await supabase.from('historial_alumnos').insert({
+                                id: h.id,
+                                alumno_id: h.alumno_id,
+                                ano_academico_id: h.ano_academico_id,
+                                curso: h.curso,
+                                grupo: h.grupo,
+                                telefono: h.telefono,
+                                bilingue: h.bilingue,
+                                beca: h.beca,
+                                socio_ampa: h.socio_ampa,
+                                diversificacion: h.diversificacion,
+                                donante: h.donante,
+                                observaciones: h.observaciones,
+                                lote_entregado: h.lote_entregado,
+                                fecha_entrega: h.fecha_entrega,
+                                activo: h.activo
+                            });
+                        }
+                        console.log(`✅ Restaurados ${historiales.length} registros de historial`);
+                    }
+                }
+                
+                alert('✅ Restauración completada. Recarga la página para ver los cambios.');
+                location.reload();
+                
+            } catch (error) {
+                console.error('Error al restaurar:', error);
+                alert('Error al restaurar el backup: ' + error.message);
+            } finally {
+                if (loadingMsg) loadingMsg.remove();
+            }
+        };
+        input.click();
+    }    
     async function listarAlumnosProblemas() {
         const container = document.getElementById('listaInformesResultados');
         container.innerHTML = '<p>Cargando...</p>';
