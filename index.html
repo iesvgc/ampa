@@ -58,6 +58,7 @@
 <body>
 <div class="container">
 
+
     <div class="top-bar">
         <h1 style="margin:0">📚 Banco de Libros</h1>
         <div class="flex">
@@ -66,6 +67,7 @@
                 <select id="selectAnoAcademico"></select>
                 <span id="anoActivoBadge" style="background:#10b981; color:white; padding:4px 12px; border-radius:40px; font-size:0.8rem;">Activo</span>
             </div>
+            <button id="btnPromocionarCurso" class="secondary" style="background:#8b5cf6;">🎓 Promocionar curso</button>
             <button id="btnBackupExcel" class="success" style="background:#10b981;">💾 Copia de seguridad (Excel)</button>
             <button id="btnRestoreSQL" class="secondary" style="background:#f59e0b;">🔄 Restaurar backup</button>
         </div>
@@ -161,7 +163,8 @@
         
         const btnRestore = document.getElementById('btnRestoreSQL');
         if (btnRestore) btnRestore.onclick = restaurarBackup;
-
+        const btnPromocionar = document.getElementById('btnPromocionarCurso');
+        if (btnPromocionar) btnPromocionar.onclick = mostrarPromocionCurso;
         
         cargarTab(currentTab);
     }
@@ -189,7 +192,238 @@
             if (currentTab) cargarTab(currentTab);
         });
     }
+    // ==================== PROMOCIÓN DE CURSO ====================
+    async function mostrarPromocionCurso() {
+        // Obtener el año activo (origen) y el siguiente año (destino)
+        const { data: anoOrigen } = await supabase.from('ano_academico').select('id, nombre').eq('activo', true).single();
+        
+        // Buscar el siguiente año (2026/2027)
+        let siguienteNumero = parseInt(anoOrigen.nombre.split('/')[0]) + 1;
+        let siguienteNombre = `${siguienteNumero}/${siguienteNumero + 1}`;
+        
+        let { data: anoDestino } = await supabase
+            .from('ano_academico')
+            .select('id, nombre')
+            .eq('nombre', siguienteNombre)
+            .maybeSingle();
+        
+        // Si no existe el año destino, crearlo
+        if (!anoDestino) {
+            const { data: nuevo } = await supabase
+                .from('ano_academico')
+                .insert({ nombre: siguienteNombre, activo: false, fecha_inicio: `${siguienteNumero}-09-01`, fecha_fin: `${siguienteNumero + 1}-06-20` })
+                .select()
+                .single();
+            anoDestino = nuevo;
+        }
+        
+        // Mostrar selector de curso
+        let html = `
+            <div class="modal-promocion" id="modalPromocion">
+                <div class="modal-promocion-contenido">
+                    <h2>🎓 Promocionar curso</h2>
+                    <p>Desde: <strong>${anoOrigen.nombre}</strong> → Hacia: <strong>${anoDestino.nombre}</strong></p>
+                    <div class="form-grid">
+                        <div><label>Curso origen</label>
+                            <select id="promocionCursoOrigen">
+                                <option value="">Selecciona curso</option>
+                                <option value="1ESO">1ESO</option><option value="2ESO">2ESO</option>
+                                <option value="3ESO">3ESO</option><option value="4ESO">4ESO</option>
+                                <option value="1BAC">1BAC</option><option value="2BAC">2BAC</option>
+                            </select>
+                        </div>
+                        <div><label>Grupo (opcional)</label>
+                            <input type="text" id="promocionGrupoOrigen" placeholder="Ej: A, B, C">
+                        </div>
+                    </div>
+                    <button id="btnCargarAlumnosPromocion" class="success">Cargar alumnos</button>
+                    <button id="btnCerrarPromocion" class="secondary">Cerrar</button>
+                    <div id="listaPromocion" style="margin-top:20px;"></div>
+                    <div style="margin-top:15px; display:flex; gap:10px; justify-content:flex-end;">
+                        <button id="btnGuardarPromocion" class="success" style="display:none;">💾 Guardar promoción</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+        document.getElementById('btnCargarAlumnosPromocion').onclick = () => cargarAlumnosParaPromocion(anoOrigen.id, anoDestino.id);
+        document.getElementById('btnCerrarPromocion').onclick = () => document.getElementById('modalPromocion')?.remove();
+        document.getElementById('btnGuardarPromocion').onclick = () => guardarPromocion(anoDestino.id);
+    }
     
+    async function cargarAlumnosParaPromocion(anoOrigenId, anoDestinoId) {
+        const curso = document.getElementById('promocionCursoOrigen').value;
+        const grupo = document.getElementById('promocionGrupoOrigen').value.trim();
+        
+        if (!curso) {
+            alert("Selecciona un curso");
+            return;
+        }
+        
+        const listaDiv = document.getElementById('listaPromocion');
+        listaDiv.innerHTML = '<p>Cargando alumnos...</p>';
+        
+        // Obtener alumnos del curso origen
+        let query = supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', anoOrigenId)
+            .eq('curso', curso);
+        
+        if (grupo) query = query.eq('grupo', grupo);
+        
+        const { data: alumnosOrigen } = await query;
+        
+        if (!alumnosOrigen || alumnosOrigen.length === 0) {
+            listaDiv.innerHTML = '<p>No hay alumnos en este curso/grupo</p>';
+            return;
+        }
+        
+        // Mapa de curso destino
+        const cursoDestinoMap = {
+            '1ESO': '2ESO',
+            '2ESO': '3ESO',
+            '3ESO': '4ESO',
+            '4ESO': '1BAC',
+            '1BAC': '2BAC',
+            '2BAC': '2BAC'  // Los de 2BAC ya no promocionan
+        };
+        
+        // Verificar qué alumnos ya tienen registro en el año destino
+        const { data: yaExisten } = await supabase
+            .from('historial_alumnos')
+            .select('alumno_id')
+            .eq('ano_academico_id', anoDestinoId);
+        
+        const existentesIds = new Set(yaExisten?.map(e => e.alumno_id) || []);
+        
+        let html = `
+            <h3>Alumnos de ${curso}${grupo ? ' ' + grupo : ''} (${alumnosOrigen.length})</h3>
+            <div style="overflow-x:auto;">
+                <table class="tabla-promocion" style="width:100%; font-size:0.8rem;">
+                    <thead>
+                        <tr>
+                            <th>Alumno</th>
+                            <th>Curso origen</th>
+                            <th>Grupo</th>
+                            <th>Curso destino</th>
+                            <th>Grupo destino</th>
+                            <th>Baja</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        for (const h of alumnosOrigen) {
+            const alumno = h.alumnos;
+            const yaTieneRegistro = existentesIds.has(alumno.id);
+            const cursoPorDefecto = cursoDestinoMap[curso] || curso;
+            
+            html += `
+                <tr data-alumno-id="${alumno.id}" data-historial-id="${h.id}">
+                    <td><strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br><small>Código: ${alumno.codigo_usuario || '-'}</small></td>
+                    <td>${h.curso}</td>
+                    <td><input type="text" class="grupo-origen" value="${h.grupo || ''}" disabled style="background:#f0f0f0;"></td>
+                    <td>
+                        <select class="curso-destino" ${yaTieneRegistro ? 'disabled' : ''}>
+                            <option value="1ESO">1ESO</option><option value="2ESO">2ESO</option>
+                            <option value="3ESO">3ESO</option><option value="4ESO">4ESO</option>
+                            <option value="1BAC">1BAC</option><option value="2BAC">2BAC</option>
+                        </select>
+                    </td>
+                    <td><input type="text" class="grupo-destino" placeholder="Grupo" ${yaTieneRegistro ? 'disabled' : ''}></td>
+                    <td style="text-align:center;"><input type="checkbox" class="baja-checkbox" ${yaTieneRegistro ? 'disabled' : ''}></td>
+                    <td style="text-align:center;">
+                        ${yaTieneRegistro ? '✅ Ya promocionado' : '⏳ Pendiente'}
+                    </td>
+                </tr>
+            `;
+        }
+        
+        html += `</tbody> домаћинствима`;
+        listaDiv.innerHTML = html;
+        
+        // Pre-seleccionar curso destino
+        const cursoDestinoDefault = cursoDestinoMap[curso] || curso;
+        const selects = listaDiv.querySelectorAll('.curso-destino');
+        selects.forEach(select => {
+            if (!select.disabled) {
+                select.value = cursoDestinoDefault;
+            }
+        });
+        
+        document.getElementById('btnGuardarPromocion').style.display = 'inline-block';
+    }
+    
+    async function guardarPromocion(anoDestinoId) {
+        const filas = document.querySelectorAll('#listaPromocion tbody tr');
+        let creados = 0;
+        let errores = 0;
+        
+        for (const fila of filas) {
+            const alumnoId = parseInt(fila.dataset.alumnoId);
+            const historialOrigenId = parseInt(fila.dataset.historialId);
+            const cursoDestino = fila.querySelector('.curso-destino')?.value;
+            const grupoDestino = fila.querySelector('.grupo-destino')?.value;
+            const baja = fila.querySelector('.baja-checkbox')?.checked;
+            const yaPromocionado = fila.querySelector('.curso-destino')?.disabled;
+            
+            // Saltar si ya estaba promocionado o si está marcado como baja
+            if (yaPromocionado || baja) continue;
+            
+            if (!cursoDestino) continue;
+            
+            // Obtener los datos del alumno desde el historial origen
+            const { data: origen } = await supabase
+                .from('historial_alumnos')
+                .select('*')
+                .eq('id', historialOrigenId)
+                .single();
+            
+            if (!origen) continue;
+            
+            // Crear nuevo registro en historial para el año destino
+            const nuevoHistorial = {
+                alumno_id: alumnoId,
+                ano_academico_id: anoDestinoId,
+                curso: cursoDestino,
+                grupo: grupoDestino || '',
+                telefono: origen.telefono || '',
+                bilingue: false,      // Resetear
+                beca: false,          // Resetear
+                socio_ampa: false,    // Resetear
+                diversificacion: origen.diversificacion || false,
+                donante: origen.donante || false,
+                observaciones: origen.observaciones || '',
+                activo: true,
+                lote_entregado: false
+            };
+            
+            const { error } = await supabase.from('historial_alumnos').insert(nuevoHistorial);
+            
+            if (error) {
+                console.error('Error al promocionar:', error);
+                errores++;
+            } else {
+                creados++;
+                // Marcar fila como procesada
+                fila.style.backgroundColor = '#dcfce7';
+                const tdEstado = fila.querySelector('td:last-child');
+                if (tdEstado) tdEstado.innerHTML = '✅ Promocionado';
+            }
+        }
+        
+        alert(`✅ Promoción completada: ${creados} alumnos promocionados.\n❌ Errores: ${errores}`);
+        
+        // Recargar la lista para mostrar actualización
+        const curso = document.getElementById('promocionCursoOrigen').value;
+        const grupo = document.getElementById('promocionGrupoOrigen').value;
+        const anoOrigenId = (await supabase.from('ano_academico').select('id').eq('activo', true).single()).data.id;
+        cargarAlumnosParaPromocion(anoOrigenId, anoDestinoId);
+    }    
     function setupEventListeners() {
         document.querySelectorAll('.nav-tab').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -485,6 +719,45 @@
                         body { padding: 20px; }
                         .page-break { page-break-after: always; }
                     }
+                    /* Modal de promoción */
+                    .modal-promocion {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.5);
+                        z-index: 10001;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                    .modal-promocion-contenido {
+                        background: white;
+                        border-radius: 20px;
+                        padding: 24px;
+                        max-width: 90%;
+                        width: 800px;
+                        max-height: 80%;
+                        overflow-y: auto;
+                    }
+                    .tabla-promocion th, .tabla-promocion td {
+                        padding: 8px;
+                        border-bottom: 1px solid #ddd;
+                        text-align: left;
+                    }
+                    .tabla-promocion th {
+                        background: #2563eb;
+                        color: white;
+                        position: sticky;
+                        top: 0;
+                    }
+                    .tabla-promocion select, .tabla-promocion input {
+                        width: 100%;
+                        padding: 4px;
+                    }
+
+                    
                 </style>
             </head>
             <body>
