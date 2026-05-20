@@ -69,16 +69,19 @@
             </div>
             <div class="admin-menu" style="position:relative;">
                 <button id="btnAdminToggle" style="background:#64748b; font-size:1.2rem; padding:8px 12px;">⚙️</button>
-                <div id="adminMenuOpciones" style="display:none; position:absolute; top:100%; right:0; background:white; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.15); padding:8px; z-index:1000; min-width:180px;">
-                    <button id="btnMarcarActivo" style="background:#10b981; width:100%; margin-bottom:5px;">⭐ Marcar año activo</button>
-                    <button id="btnPromocionarCurso" style="background:#8b5cf6; width:100%; margin-bottom:5px;">🎓 Promocionar curso</button>
-                    <button id="btnBackupExcel" style="background:#10b981; width:100%; margin-bottom:5px;">💾 Copia de seguridad</button>
-                    <button id="btnRestoreSQL" style="background:#f59e0b; width:100%;">🔄 Restaurar backup</button>
-                </div>
             </div>
         </div>
     </div>
-
+    
+    <!-- Menú de ajustes centrado debajo (aparece/desaparece al hacer clic en el icono) -->
+    <div id="adminMenuOpciones" style="display:none; text-align:center; margin-bottom:20px;">
+        <div style="display:inline-flex; flex-wrap:wrap; gap:10px; justify-content:center; background:white; padding:12px 20px; border-radius:40px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+            <button id="btnMarcarActivo" style="background:#10b981;">⭐ Marcar año activo</button>
+            <button id="btnPromocionarCurso" style="background:#8b5cf6;">🎓 Promocionar curso</button>
+            <button id="btnBackupExcel" style="background:#10b981;">💾 Copia de seguridad</button>
+            <button id="btnRestoreSQL" style="background:#f59e0b;">🔄 Restaurar backup</button>
+        </div>
+    </div>
     <div class="nav-tabs">
         <button class="nav-tab active" data-tab="alumnos">👨‍🎓 ALUMNOS</button>
         <button class="nav-tab" data-tab="socios">💰 SOCIOS AMPA</button>
@@ -179,7 +182,12 @@
         if (btnAdminToggle) {
             btnAdminToggle.onclick = (e) => {
                 e.stopPropagation();
-                adminMenu.style.display = adminMenu.style.display === 'none' ? 'block' : 'none';
+                // Alternar entre mostrar y ocultar
+                if (adminMenu.style.display === 'none' || adminMenu.style.display === '') {
+                    adminMenu.style.display = 'block';
+                } else {
+                    adminMenu.style.display = 'none';
+                }
             };
             // Cerrar al hacer clic fuera
             document.addEventListener('click', function(e) {
@@ -187,7 +195,7 @@
                     adminMenu.style.display = 'none';
                 }
             });
-        }        
+        }    
         cargarTab(currentTab);
     }
     async function marcarAnoActivo() {
