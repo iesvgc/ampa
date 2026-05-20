@@ -67,10 +67,15 @@
                 <select id="selectAnoAcademico"></select>
                 <span id="anoActivoBadge" style="background:#10b981; color:white; padding:4px 12px; border-radius:40px; font-size:0.8rem;">Activo</span>
             </div>
-            <button id="btnMarcarActivo" class="secondary" style="background:#10b981;">⭐ Marcar año como actual</button>
-            <button id="btnPromocionarCurso" class="secondary" style="background:#8b5cf6;">🎓 Promocionar curso</button>
-            <button id="btnBackupExcel" class="success" style="background:#10b981;">💾 Copia (Excel)</button>
-            <button id="btnRestoreSQL" class="secondary" style="background:#f59e0b;">🔄 Restaurar </button>
+            <div class="admin-menu" style="position:relative;">
+                <button id="btnAdminToggle" style="background:#64748b; font-size:1.2rem; padding:8px 12px;">⚙️</button>
+                <div id="adminMenuOpciones" style="display:none; position:absolute; top:100%; right:0; background:white; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.15); padding:8px; z-index:1000; min-width:180px;">
+                    <button id="btnMarcarActivo" style="background:#10b981; width:100%; margin-bottom:5px;">⭐ Marcar año activo</button>
+                    <button id="btnPromocionarCurso" style="background:#8b5cf6; width:100%; margin-bottom:5px;">🎓 Promocionar curso</button>
+                    <button id="btnBackupExcel" style="background:#10b981; width:100%; margin-bottom:5px;">💾 Copia de seguridad</button>
+                    <button id="btnRestoreSQL" style="background:#f59e0b; width:100%;">🔄 Restaurar backup</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -169,7 +174,20 @@
 
         const btnMarcarActivo = document.getElementById('btnMarcarActivo');
         if (btnMarcarActivo) btnMarcarActivo.onclick = marcarAnoActivo;        
-        
+        const btnAdminToggle = document.getElementById('btnAdminToggle');
+        const adminMenu = document.getElementById('adminMenuOpciones');
+        if (btnAdminToggle) {
+            btnAdminToggle.onclick = (e) => {
+                e.stopPropagation();
+                adminMenu.style.display = adminMenu.style.display === 'none' ? 'block' : 'none';
+            };
+            // Cerrar al hacer clic fuera
+            document.addEventListener('click', function(e) {
+                if (!adminMenu.contains(e.target) && e.target !== btnAdminToggle) {
+                    adminMenu.style.display = 'none';
+                }
+            });
+        }        
         cargarTab(currentTab);
     }
     async function marcarAnoActivo() {
@@ -236,11 +254,22 @@
         });
     }
     // ==================== PROMOCIÓN DE CURSO ====================
+    let panelPromocionVisible = false;
+    
     async function mostrarPromocionCurso() {
+        // Si ya hay un panel de promoción, lo eliminamos
+        const panelExistente = document.getElementById('panelPromocion');
+        if (panelExistente) {
+            panelExistente.remove();
+            panelPromocionVisible = false;
+            return;
+        }
+        
+        panelPromocionVisible = true;
+        
         // Obtener el año activo (origen) y el siguiente año (destino)
         const { data: anoOrigen } = await supabase.from('ano_academico').select('id, nombre').eq('activo', true).single();
         
-        // Buscar el siguiente año (2026/2027)
         let siguienteNumero = parseInt(anoOrigen.nombre.split('/')[0]) + 1;
         let siguienteNombre = `${siguienteNumero}/${siguienteNumero + 1}`;
         
@@ -250,7 +279,6 @@
             .eq('nombre', siguienteNombre)
             .maybeSingle();
         
-        // Si no existe el año destino, crearlo
         if (!anoDestino) {
             const { data: nuevo } = await supabase
                 .from('ano_academico')
@@ -260,39 +288,43 @@
             anoDestino = nuevo;
         }
         
-        // Mostrar selector de curso
         let html = `
-            <div class="modal-promocion" id="modalPromocion">
-                <div class="modal-promocion-contenido">
-                    <h2>🎓 Promocionar curso</h2>
-                    <p>Desde: <strong>${anoOrigen.nombre}</strong> → Hacia: <strong>${anoDestino.nombre}</strong></p>
-                    <div class="form-grid">
-                        <div><label>Curso origen</label>
-                            <select id="promocionCursoOrigen">
-                                <option value="">Selecciona curso</option>
-                                <option value="1ESO">1ESO</option><option value="2ESO">2ESO</option>
-                                <option value="3ESO">3ESO</option><option value="4ESO">4ESO</option>
-                                <option value="1BAC">1BAC</option><option value="2BAC">2BAC</option>
-                            </select>
-                        </div>
-                        <div><label>Grupo (opcional)</label>
-                            <input type="text" id="promocionGrupoOrigen" placeholder="Ej: A, B, C">
-                        </div>
+            <div id="panelPromocion" class="card" style="margin-top:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>🎓 Promocionar curso</h3>
+                    <button id="btnCerrarPanelPromocion" style="background:#dc2626; padding:4px 12px;">✖</button>
+                </div>
+                <p>Desde: <strong>${anoOrigen.nombre}</strong> → Hacia: <strong>${anoDestino.nombre}</strong></p>
+                <div class="form-grid">
+                    <div><label>Curso origen</label>
+                        <select id="promocionCursoOrigen">
+                            <option value="">Selecciona curso</option>
+                            <option value="1ESO">1ESO</option><option value="2ESO">2ESO</option>
+                            <option value="3ESO">3ESO</option><option value="4ESO">4ESO</option>
+                            <option value="1BAC">1BAC</option><option value="2BAC">2BAC</option>
+                        </select>
                     </div>
-                    <button id="btnCargarAlumnosPromocion" class="success">Cargar alumnos</button>
-                    <button id="btnCerrarPromocion" class="secondary">Cerrar</button>
-                    <div id="listaPromocion" style="margin-top:20px;"></div>
-                    <div style="margin-top:15px; display:flex; gap:10px; justify-content:flex-end;">
-                        <button id="btnGuardarPromocion" class="success" style="display:none;">💾 Guardar promoción</button>
+                    <div><label>Grupo (opcional)</label>
+                        <input type="text" id="promocionGrupoOrigen" placeholder="Ej: A, B, C">
                     </div>
+                </div>
+                <button id="btnCargarAlumnosPromocion" class="success">Cargar alumnos</button>
+                <div id="listaPromocion" style="margin-top:20px;"></div>
+                <div style="margin-top:15px; display:flex; gap:10px; justify-content:flex-end;">
+                    <button id="btnGuardarPromocion" class="success" style="display:none;">💾 Guardar promoción</button>
                 </div>
             </div>
         `;
         
-        document.body.insertAdjacentHTML('beforeend', html);
+        // Insertar el panel justo después de .nav-tabs
+        const navTabs = document.querySelector('.nav-tabs');
+        navTabs.insertAdjacentHTML('afterend', html);
         
+        document.getElementById('btnCerrarPanelPromocion').onclick = () => {
+            document.getElementById('panelPromocion')?.remove();
+            panelPromocionVisible = false;
+        };
         document.getElementById('btnCargarAlumnosPromocion').onclick = () => cargarAlumnosParaPromocion(anoOrigen.id, anoDestino.id);
-        document.getElementById('btnCerrarPromocion').onclick = () => document.getElementById('modalPromocion')?.remove();
         document.getElementById('btnGuardarPromocion').onclick = () => guardarPromocion(anoDestino.id);
     }
     
@@ -810,7 +842,11 @@
                         width: 100%;
                         padding: 4px;
                     }
-
+                    .admin-menu button {
+                        width: 100%;
+                        text-align: left;
+                        padding: 8px 12px;
+                    }
                     
                 </style>
             </head>
