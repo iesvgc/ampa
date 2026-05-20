@@ -571,6 +571,7 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
+                        <div><label>Grupo</label><input type="text" id="entregarGrupo" placeholder="Ej: A, B, C"></div>
                         <div><label>Código de usuario</label><input type="text" id="entregarCodigo" placeholder="Ej: 202670001"></div>
                     </div>
                     <button id="btnEntregarBuscar">Buscar alumnos</button>
@@ -587,12 +588,13 @@
             document.getElementById('entregarNombre').value = '';
             document.getElementById('entregarApellidos').value = '';
             document.getElementById('entregarCurso').value = '';
+            document.getElementById('entregarGrupo').value = '';
             document.getElementById('entregarCodigo').value = '';
             document.getElementById('entregarResultados').innerHTML = '';
         };
         document.getElementById('btnEntregarBuscarClase').onclick = () => mostrarBuscarClaseEntrega();
         
-        const inputs = ['entregarNombre', 'entregarApellidos', 'entregarCurso', 'entregarCodigo'];
+        const inputs = ['entregarNombre', 'entregarApellidos', 'entregarCurso', 'entregarGrupo', 'entregarCodigo'];
         inputs.forEach(id => {
             const el = document.getElementById(id);
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarAlumnosParaEntrega(); });
@@ -603,6 +605,7 @@
         const nombreRaw = document.getElementById('entregarNombre').value.trim();
         const apellidosRaw = document.getElementById('entregarApellidos').value.trim();
         const cursoFiltro = document.getElementById('entregarCurso').value;
+        const grupoFiltro = document.getElementById('entregarGrupo').value.trim();
         const codigoRaw = document.getElementById('entregarCodigo').value.trim();
         
         const resultadosDiv = document.getElementById('entregarResultados');
@@ -621,6 +624,9 @@
             .select('*, alumnos(*)')
             .eq('ano_academico_id', anoId);
         
+        if (cursoFiltro) query = query.eq('curso', cursoFiltro);
+        if (grupoFiltro) query = query.eq('grupo', grupoFiltro);
+        
         const { data: historiales, error } = await query;
         
         if (error) {
@@ -635,7 +641,6 @@
             .eq('entregado', false)
             .eq('ano_academico_id', anoId);
         
-        // Crear mapa de conteo de préstamos por alumno
         const prestamosCount = {};
         for (const p of todosPrestamos || []) {
             prestamosCount[p.alumno_id] = (prestamosCount[p.alumno_id] || 0) + 1;
@@ -676,7 +681,7 @@
             });
         }
         
-        // Filtrar
+        // Filtrar adicionalmente
         if (codigoRaw) {
             resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
         }
@@ -685,9 +690,6 @@
         }
         if (apellidosBusq) {
             resultados = resultados.filter(a => normalizarTexto(a.apellidos).includes(apellidosBusq));
-        }
-        if (cursoFiltro) {
-            resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
         if (resultados.length === 0) {
@@ -2610,6 +2612,7 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
+                        <div><label>Grupo</label><input type="text" id="prepararGrupo" placeholder="Ej: A, B, C"></div>
                         <div><label>Código de usuario</label><input type="text" id="prepararCodigo" placeholder="Ej: 202670001"></div>
                     </div>
                     <button id="btnPrepararBuscar">Buscar alumnos</button>
@@ -2633,6 +2636,7 @@
             document.getElementById('prepararNombre').value = '';
             document.getElementById('prepararApellidos').value = '';
             document.getElementById('prepararCurso').value = '';
+            document.getElementById('prepararGrupo').value = '';
             document.getElementById('prepararCodigo').value = '';
             document.getElementById('prepararResultados').innerHTML = '';
             document.getElementById('prepararLoteInfo').style.display = 'none';
@@ -2640,7 +2644,7 @@
             alumnoSeleccionadoPreparar = null;
         };
         
-        const inputs = ['prepararNombre', 'prepararApellidos', 'prepararCurso', 'prepararCodigo'];
+        const inputs = ['prepararNombre', 'prepararApellidos', 'prepararCurso', 'prepararGrupo', 'prepararCodigo'];
         inputs.forEach(id => {
             const el = document.getElementById(id);
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarAlumnosParaPreparar(); });
@@ -2651,6 +2655,7 @@
         const nombreRaw = document.getElementById('prepararNombre').value.trim();
         const apellidosRaw = document.getElementById('prepararApellidos').value.trim();
         const cursoFiltro = document.getElementById('prepararCurso').value;
+        const grupoFiltro = document.getElementById('prepararGrupo').value.trim();
         const codigoRaw = document.getElementById('prepararCodigo').value.trim();
         
         const resultadosDiv = document.getElementById('prepararResultados');
@@ -2668,6 +2673,9 @@
             .from('historial_alumnos')
             .select('*, alumnos(*)')
             .eq('ano_academico_id', anoId);
+        
+        if (cursoFiltro) query = query.eq('curso', cursoFiltro);
+        if (grupoFiltro) query = query.eq('grupo', grupoFiltro);
         
         const { data: historiales, error } = await query;
         
@@ -2689,7 +2697,7 @@
             .select('alumno_id, lote_entregado')
             .eq('ano_academico_id', anoId);
         
-        // Crear mapas para acceso rápido
+        // Crear mapas
         const prestamosPorAlumno = {};
         for (const p of todosPrestamos || []) {
             if (!prestamosPorAlumno[p.alumno_id]) prestamosPorAlumno[p.alumno_id] = [];
@@ -2738,7 +2746,7 @@
             });
         }
         
-        // Filtrar
+        // Filtrar adicionalmente por nombre y código
         if (codigoRaw) {
             resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
         }
@@ -2747,9 +2755,6 @@
         }
         if (apellidosBusq) {
             resultados = resultados.filter(a => normalizarTexto(a.apellidos).includes(apellidosBusq));
-        }
-        if (cursoFiltro) {
-            resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
         if (resultados.length === 0) {
@@ -2760,10 +2765,12 @@
         // Mostrar resultados en tabla
         let html = `<h3>Selecciona un alumno (${resultados.length} resultados)</h3>
             <div style="overflow-x:auto;">
-                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem; min-width:800px;">
                     <thead><tr style="background:#2563eb; color:white;">
-                        <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                        <th>Beca</th><th>Socio</th><th>Estado</th><th></th>
+                        <th style="padding:6px;">Código</th><th style="padding:6px;">Nombre</th><th style="padding:6px;">Apellidos</th>
+                        <th style="padding:6px;">Curso</th><th style="padding:6px;">Grupo</th>
+                        <th style="padding:6px;">Beca</th><th style="padding:6px;">Socio</th>
+                        <th style="padding:6px;">Estado</th><th style="padding:6px;"></th>
                     </tr></thead>
                     <tbody>`;
         
@@ -2779,7 +2786,7 @@
                     <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
                     <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
                     <td style="padding:6px;"><button onclick="seleccionarAlumnoPrepararConEstado(${a.id})">Seleccionar</button></td>
-                </tr>
+                </table>
             `;
         }
         html += `</tbody></table></div>`;
