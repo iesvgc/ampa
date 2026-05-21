@@ -1710,14 +1710,43 @@
         // ========== BOTÓN GUARDAR ==========
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
             // Validar teléfono (obligatorio, 9 dígitos)
+            // Validar teléfono con opción de saltar
             const telefono = document.getElementById('editTelefono').value.trim();
-            if (!telefono) {
-                alert("El teléfono es obligatorio");
-                return;
-            }
-            if (!/^[0-9]{9}$/.test(telefono)) {
-                alert("El teléfono debe tener 9 dígitos numéricos (ej: 666123456)");
-                return;
+            let telefonoValido = true;
+            
+            if (telefono && !/^[0-9]{9}$/.test(telefono)) {
+                const respuesta = confirm(
+                    `⚠️ El teléfono "${telefono}" no tiene 9 dígitos.\n\n` +
+                    `¿Qué quieres hacer?\n\n` +
+                    `• Haz clic en "Aceptar" para CORREGIR el teléfono\n` +
+                    `• Haz clic en "Cancelar" para GUARDAR SIN TELÉFONO\n\n` +
+                    `(Puedes dejar el teléfono vacío si no lo sabes)`
+                );
+                
+                if (respuesta) {
+                    // Usuario quiere corregir -> no guardamos, volvemos al formulario
+                    alert("Por favor, corrige el número de teléfono (debe tener 9 dígitos)");
+                    document.getElementById('editTelefono').focus();
+                    return;
+                } else {
+                    // Usuario acepta guardar sin teléfono
+                    telefonoValido = false;
+                    // Vaciamos el campo para que no haya datos incorrectos
+                    document.getElementById('editTelefono').value = '';
+                }
+            } else if (!telefono) {
+                // Teléfono vacío: preguntar si quiere continuar
+                const seguir = confirm(
+                    "⚠️ El teléfono está vacío.\n\n" +
+                    "¿Quieres GUARDAR SIN TELÉFONO o quieres CORREGIR?\n\n" +
+                    "• Aceptar → Guardar sin teléfono\n" +
+                    "• Cancelar → Volver a rellenar el teléfono"
+                );
+                if (!seguir) {
+                    document.getElementById('editTelefono').focus();
+                    return;
+                }
+                telefonoValido = false;
             }
             
             let nuevoAlumnoId = alumnoId;
