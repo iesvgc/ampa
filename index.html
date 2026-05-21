@@ -1938,6 +1938,7 @@
                         <div><label>Filtrar socios</label><select id="socioEstado">
                             <option value="">Todos</option>
                             <option value="socio">✅ Solo socios</option>
+                            <option value="no_socio">❌ Solo no socios</option>
                         </select></div>                      
                     </div>
                     <button id="btnBuscarSocio" style="margin-top:10px;">Buscar</button>
@@ -1956,6 +1957,7 @@
             document.getElementById('socioApellidos').value = '';
             document.getElementById('socioCurso').value = '';
             document.getElementById('socioCodigo').value = '';
+            document.getElementById('socioEstado').value = ''; // Resetear filtro
             document.getElementById('resultadosSocios').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar alumnos</p>';
         };
         
@@ -1965,7 +1967,6 @@
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarSociosMejorado(); });
         });
     }
-
 
     async function buscarSociosMejorado() {
         // USAR EL AÑO SELECCIONADO EN EL SELECTOR
@@ -1994,8 +1995,6 @@
             .from('historial_alumnos')
             .select('*, alumnos(*)')
             .eq('ano_academico_id', anoId);   // ← USAR anoId
-        
-
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
@@ -2045,9 +2044,11 @@
             alumno.n_socio = socio?.n_socio || null;
         }
         
-        // Filtrar por estado socio
+        // Filtrar por estado socio (MODIFICADO PARA INCLUIR "NO SOCIOS")
         if (estadoFiltro === 'socio') {
             resultados = resultados.filter(a => a.socio_ampa === true);
+        } else if (estadoFiltro === 'no_socio') {
+            resultados = resultados.filter(a => a.socio_ampa === false);
         }
         
         if (resultados.length === 0) {
@@ -2076,6 +2077,7 @@
             `;
         }
         resultadosDiv.innerHTML = html;
+
     }
     window.confirmarEntregaDirecta = async (alumnoId, nombre) => {
         if(confirm(`¿Confirmar entrega de lote para ${nombre}?`)) {
