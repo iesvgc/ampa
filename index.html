@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Banco de Libros</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -52,10 +52,76 @@
         
         .btn-prestamo-inactivo {
             background: #2563eb;
-        }        
+        }
+        /* Pantalla de login */
+        #loginOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            z-index: 20000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .login-card h1 {
+            margin-bottom: 10px;
+            color: #1e40af;
+        }
+        .login-card input {
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+        }
+        .login-card button {
+            width: 100%;
+            padding: 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .login-card button:hover {
+            background: #1e40af;
+        }
+        .error-msg {
+            color: #dc2626;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+        
     </style>
 </head>
 <body>
+<!-- Pantalla de LOGIN -->
+<div id="loginOverlay">
+    <div class="login-card">
+        <h1>📚 Banco de Libros</h1>
+        <p style="color:#64748b; margin-bottom:20px;">Acceso restringido</p>
+        <input type="text" id="loginUser" placeholder="Usuario" autocomplete="off">
+        <input type="password" id="loginPass" placeholder="Contraseña">
+        <button id="btnLogin">Entrar</button>
+        <div id="loginError" class="error-msg"></div>
+    </div>
+</div>
 <div class="container">
 
 
@@ -161,12 +227,83 @@
     let currentEditingAlumnoId = null;
     let modoActual = "";
     let scannerActivo = false;
+    // ==================== LOGIN ====================
+    let usuarioLogueado = false;
     
+    // ==================== LOGIN ====================
+    async function verificarLogin() {
+        if (sessionStorage.getItem('loggedIn') === 'true') {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.querySelector('.container').style.display = 'block';
+            document.querySelector('.nav-tabs').style.display = 'flex';
+            document.getElementById('mainPanel').style.display = 'block';
+            await init();
+            return;
+        }
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.querySelector('.container').style.display = 'none';
+        document.querySelector('.nav-tabs').style.display = 'none';
+        document.getElementById('mainPanel').style.display = 'none';
+    }
+    
+    async function hacerLogin() {
+        const username = document.getElementById('loginUser').value.trim();
+        const password = document.getElementById('loginPass').value;
+        const errorDiv = document.getElementById('loginError');
+        
+        if (!username || !password) {
+            errorDiv.textContent = '❌ Usuario y contraseña obligatorios';
+            return;
+        }
+        
+        errorDiv.textContent = 'Verificando...';
+        
+        try {
+            const { data: usuarios, error } = await supabase
+                .from('usuarios_app')
+                .select('username, password')
+                .eq('username', username)
+                .eq('password', password);
+            
+            if (error) throw error;
+            
+            if (usuarios && usuarios.length > 0) {
+                sessionStorage.setItem('loggedIn', 'true');
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.querySelector('.container').style.display = 'block';
+                document.querySelector('.nav-tabs').style.display = 'flex';
+                document.getElementById('mainPanel').style.display = 'block';
+                await init();
+            } else {
+                errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
+            }
+        } catch (error) {
+            errorDiv.textContent = '❌ Error de conexión: ' + error.message;
+            console.error(error);
+        }
+    }
+    
+    // ========== EXPORTAR FUNCIONES AL GLOBAL ==========
+    window.hacerLogin = hacerLogin;
+    window.verificarLogin = verificarLogin;  
     // ==================== INICIALIZACIÓN ====================
     async function init() {
+        // Verificar login antes de cargar nada
+        if (sessionStorage.getItem('loggedIn') !== 'true') {
+            // No llamar a verificarLogin() aquí, solo ocultar el contenido principal
+            document.querySelector('.container')?.style.setProperty('display', 'none');
+            document.querySelector('.nav-tabs')?.style.setProperty('display', 'none');
+            document.getElementById('mainPanel')?.style.setProperty('display', 'none');
+            return;
+        }
+        
+        // Mostrar el contenido principal
+        document.querySelector('.container')?.style.setProperty('display', 'block');
+        document.querySelector('.nav-tabs')?.style.setProperty('display', 'flex');
+        document.getElementById('mainPanel')?.style.setProperty('display', 'block');
+
         await cargarAnosAcademicos();
         setupEventListeners();
-        // Botones de backup y restauración
         const btnBackup = document.getElementById('btnBackupExcel');
         if (btnBackup) btnBackup.onclick = descargarBackupExcel;
         
@@ -182,14 +319,12 @@
         if (btnAdminToggle) {
             btnAdminToggle.onclick = (e) => {
                 e.stopPropagation();
-                // Alternar entre mostrar y ocultar
                 if (adminMenu.style.display === 'none' || adminMenu.style.display === '') {
                     adminMenu.style.display = 'block';
                 } else {
                     adminMenu.style.display = 'none';
                 }
             };
-            // Cerrar al hacer clic fuera
             document.addEventListener('click', function(e) {
                 if (!adminMenu.contains(e.target) && e.target !== btnAdminToggle) {
                     adminMenu.style.display = 'none';
@@ -1710,43 +1845,14 @@
         // ========== BOTÓN GUARDAR ==========
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
             // Validar teléfono (obligatorio, 9 dígitos)
-            // Validar teléfono con opción de saltar
             const telefono = document.getElementById('editTelefono').value.trim();
-            let telefonoValido = true;
-            
-            if (telefono && !/^[0-9]{9}$/.test(telefono)) {
-                const respuesta = confirm(
-                    `⚠️ El teléfono "${telefono}" no tiene 9 dígitos.\n\n` +
-                    `¿Qué quieres hacer?\n\n` +
-                    `• Haz clic en "Aceptar" para CORREGIR el teléfono\n` +
-                    `• Haz clic en "Cancelar" para GUARDAR SIN TELÉFONO\n\n` +
-                    `(Puedes dejar el teléfono vacío si no lo sabes)`
-                );
-                
-                if (respuesta) {
-                    // Usuario quiere corregir -> no guardamos, volvemos al formulario
-                    alert("Por favor, corrige el número de teléfono (debe tener 9 dígitos)");
-                    document.getElementById('editTelefono').focus();
-                    return;
-                } else {
-                    // Usuario acepta guardar sin teléfono
-                    telefonoValido = false;
-                    // Vaciamos el campo para que no haya datos incorrectos
-                    document.getElementById('editTelefono').value = '';
-                }
-            } else if (!telefono) {
-                // Teléfono vacío: preguntar si quiere continuar
-                const seguir = confirm(
-                    "⚠️ El teléfono está vacío.\n\n" +
-                    "¿Quieres GUARDAR SIN TELÉFONO o quieres CORREGIR?\n\n" +
-                    "• Aceptar → Guardar sin teléfono\n" +
-                    "• Cancelar → Volver a rellenar el teléfono"
-                );
-                if (!seguir) {
-                    document.getElementById('editTelefono').focus();
-                    return;
-                }
-                telefonoValido = false;
+            if (!telefono) {
+                alert("El teléfono es obligatorio");
+                return;
+            }
+            if (!/^[0-9]{9}$/.test(telefono)) {
+                alert("El teléfono debe tener 9 dígitos numéricos (ej: 666123456)");
+                return;
             }
             
             let nuevoAlumnoId = alumnoId;
@@ -1967,7 +2073,6 @@
                         <div><label>Filtrar socios</label><select id="socioEstado">
                             <option value="">Todos</option>
                             <option value="socio">✅ Solo socios</option>
-                            <option value="no_socio">❌ Solo no socios</option>
                         </select></div>                      
                     </div>
                     <button id="btnBuscarSocio" style="margin-top:10px;">Buscar</button>
@@ -1986,7 +2091,6 @@
             document.getElementById('socioApellidos').value = '';
             document.getElementById('socioCurso').value = '';
             document.getElementById('socioCodigo').value = '';
-            document.getElementById('socioEstado').value = ''; // Resetear filtro
             document.getElementById('resultadosSocios').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar alumnos</p>';
         };
         
@@ -1996,6 +2100,7 @@
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarSociosMejorado(); });
         });
     }
+
 
     async function buscarSociosMejorado() {
         // USAR EL AÑO SELECCIONADO EN EL SELECTOR
@@ -2024,6 +2129,8 @@
             .from('historial_alumnos')
             .select('*, alumnos(*)')
             .eq('ano_academico_id', anoId);   // ← USAR anoId
+        
+
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
@@ -2073,11 +2180,9 @@
             alumno.n_socio = socio?.n_socio || null;
         }
         
-        // Filtrar por estado socio (MODIFICADO PARA INCLUIR "NO SOCIOS")
+        // Filtrar por estado socio
         if (estadoFiltro === 'socio') {
             resultados = resultados.filter(a => a.socio_ampa === true);
-        } else if (estadoFiltro === 'no_socio') {
-            resultados = resultados.filter(a => a.socio_ampa === false);
         }
         
         if (resultados.length === 0) {
@@ -2106,7 +2211,6 @@
             `;
         }
         resultadosDiv.innerHTML = html;
-
     }
     window.confirmarEntregaDirecta = async (alumnoId, nombre) => {
         if(confirm(`¿Confirmar entrega de lote para ${nombre}?`)) {
@@ -5592,9 +5696,27 @@
     window.verPrestamoLibro = verPrestamoLibro;
     window.darBajaSocio = darBajaSocio;   
     window.supabaseDebug = supabase;
+    window.supabase = supabase;
     window.buscarAlumnosMejorado = buscarAlumnosMejorado;
     window.normalizarTexto = normalizarTexto;
-    init();
+    
+    // Asignar eventos del login
+    const btnLogin = document.getElementById('btnLogin');
+    if (btnLogin) btnLogin.onclick = hacerLogin;
+    
+    const loginPass = document.getElementById('loginPass');
+    if (loginPass) {
+        loginPass.onkeypress = (e) => { if (e.key === 'Enter') hacerLogin(); };
+    }
+    
+    const loginUser = document.getElementById('loginUser');
+    if (loginUser) {
+        loginUser.onkeypress = (e) => { if (e.key === 'Enter') hacerLogin(); };
+    }
+    
+    // Iniciar verificación de login (SOLO UNA VEZ)
+    verificarLogin();
+    
 })();
 </script>
 </body>
