@@ -3651,15 +3651,21 @@
         const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
         
         // Obtener libros del lote preparado (prestamos activos)
-        const { data: prestamos } = await supabase
+        const { data: prestamos, error: prestamosError } = await supabase
             .from('prestamos')
             .select('*, libros(*)')
             .eq('alumno_id', alumnoId)
             .eq('entregado', false);
         
+        if (prestamosError) {
+            alert('Error al cargar los libros: ' + prestamosError.message);
+            return;
+        }
+        
         if (!prestamos || prestamos.length === 0) {
             alert('Este alumno no tiene libros en su lote preparado');
             document.getElementById('modificarDetallePanel').style.display = 'none';
+            buscarAlumnosParaModificar();
             return;
         }
         
@@ -3679,7 +3685,7 @@
                     <td style="padding:6px;">${libro?.materia || '-'}</td>
                     <td style="padding:6px;">${libro?.curso_para || '-'}</td>
                     <td style="padding:6px;">${libro?.signatura || '-'}</td>
-                    <td style="padding:6px;"><button onclick="eliminarLibroDelLoteModificar(${p.id}, '${libro?.titulo.replace(/'/g, "\\'")}')" style="background:#dc2626;">❌ Quitar</button></td>
+                    <td style="padding:6px;"><button onclick="eliminarLibroDelLoteModificar(${p.id}, '${libro?.titulo?.replace(/'/g, "\\'") || 'este libro'}')" style="background:#dc2626;">❌ Quitar</button></td>
                 </tr>
             `;
         }
@@ -3689,7 +3695,7 @@
         
         document.getElementById('modificarDetallePanel').style.display = 'block';
         document.getElementById('modificarDetalleContenido').innerHTML = `
-            <div class="alumno-row" style="border-left-color:#f59e0b; margin-bottom:15px;">
+            <div class="alumno-row" style="border-left-color:#f59e0b; margin-bottom:15px;" data-alumno-id="${alumnoId}">
                 <div class="alumno-info">
                     <strong>✏️ Alumno: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                     📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}
@@ -3702,34 +3708,82 @@
             document.getElementById('modificarDetallePanel').style.display = 'none';
             buscarAlumnosParaModificar(); // Refrescar lista
         };
-    };   
+    };
     window.eliminarLibroDelLoteModificar = async (prestamoId, titulo) => {
         const confirmar = confirm(`⚠️ ¿Eliminar el libro "${titulo}" del lote de este alumno?\n\nEsta acción no se puede deshacer.`);
         
         if (confirmar) {
-            const { error } = await supabase
-                .from('prestamos')
-                .delete()
-                .eq('id', prestamoId);
-            
-            if (error) {
-                alert('Error al eliminar el libro: ' + error.message);
-            } else {
-                alert(`✅ Libro "${titulo}" eliminado del lote`);
-                // Eliminar la fila visualmente
-                const fila = document.getElementById(`fila-prestamo-${prestamoId}`);
-                if (fila) fila.remove();
+            try {
+                // 1. Eliminar el préstamo de la base de datos
+                const { error: deleteError } = await supabase
+                    .from('prestamos')
+                    .delete()
+                    .eq('id', prestamoId);
                 
-                // Verificar si quedan libros en la tabla
-                const tbody = document.querySelector('#modificarDetalleContenido tbody');
-                if (tbody && tbody.children.length === 0) {
-                    document.getElementById('modificarDetallePanel').style.display = 'none';
-                    buscarAlumnosParaModificar();
-                    alert('✅ El lote del alumno ha quedado vacío');
+                if (deleteError) {
+                    alert('Error al eliminar el libro: ' + deleteError.message);
+                    return;
                 }
+                
+                alert(`✅ Libro "${titulo}" eliminado del lote`);
+                
+                // 2. Eliminar la fila visualmente de la tabla
+                const fila = document.getElementById(`fila-prestamo-${prestamoId}`);
+                if (fila) {
+                    fila.remove();
+                }
+                
+                // 3. Verificar si quedan libros en el lote de este alumno
+                // Para ello, necesitamos saber el alumno actual
+                const detalleContenido = document.getElementById('modificarDetalleContenido');
+                if (detalleContenido) {
+                    // Buscar el ID del alumno en el HTML (lo guardamos como data)
+                    const alumnoRow = detalleContenido.querySelector('.alumno-row');
+                    let alumnoId = null;
+                    if (alumnoRow && alumnoRow.dataset && alumnoRow.dataset.alumnoId) {
+                        alumnoId = parseInt(alumnoRow.dataset.alumnoId);
+                    }
+                    
+                    if (alumnoId) {
+                        // Verificar cuántos préstamos activos tiene aún este alumno
+                        const { count, error: countError } = await supabase
+                            .from('prestamos')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('alumno_id', alumnoId)
+                            .eq('entregado', false);
+                        
+                        if (!countError && count === 0) {
+                            // No quedan libros, cerrar panel y mostrar mensaje
+                            document.getElementById('modificarDetallePanel').style.display = 'none';
+                            alert('✅ El lote del alumno ha quedado vacío. El alumno ya no aparecerá en la lista de lotes preparados.');
+                            // Refrescar la lista de alumnos
+                            buscarAlumnosParaModificar();
+                            return;
+                        }
+                    }
+                }
+                
+                // 4. Opcional: refrescar el contador de libros en el título
+                const tbody = document.querySelector('#modificarDetalleContenido tbody');
+                if (tbody) {
+                    const librosRestantes = tbody.children.length;
+                    const tituloLote = document.querySelector('#modificarDetalleContenido h4');
+                    if (tituloLote) {
+                        tituloLote.innerHTML = `📚 Libros del lote (${librosRestantes})`;
+                    }
+                    if (librosRestantes === 0) {
+                        document.getElementById('modificarDetallePanel').style.display = 'none';
+                        buscarAlumnosParaModificar();
+                        alert('✅ El lote del alumno ha quedado vacío');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al eliminar el libro: ' + error.message);
             }
         }
-    };    
+    };
     async function buscarAlumnoParaPrestamo() {
         const searchTerm = document.getElementById('buscarAlumnoPrestamo').value.trim();
         const resultadoDiv = document.getElementById('resultadoAlumno');
