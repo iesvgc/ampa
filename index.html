@@ -2409,7 +2409,7 @@
             return;
         }
         
-        // Obtener listas de editoriales existentes (materias ya no hace falta, usamos predefinidas)
+        // Obtener listas de editoriales existentes
         const { data: editorialesBD } = await supabaseDebug.from('libros').select('editorial').not('editorial', 'is', null);
         const editoriales = [...new Set(editorialesBD.map(e => e.editorial))];
         
@@ -2432,8 +2432,12 @@
                             <option value="">Selecciona materia</option>
                             ${materiasPredefinidas.map(m => `<option value="${m.nombre}" data-codigo="${m.codigo}">${m.nombre}</option>`).join('')}
                         </select>
-                        <input type="text" id="nuevaMateriaInput" placeholder="O escribe una nueva materia" style="margin-top:5px;">
-                        <small style="color:#64748b; display:block; margin-top:5px;">📌 Si el libro está dividido en trimestres, escribe la materia seguida del número de trimestre. Ejemplo: Matemáticas 2</small>
+                        <small style="color:#64748b; display:block; margin-top:5px;">📌 Selecciona la materia del libro</small>
+                    </div>
+                    
+                    <div><label>Especificación / Evaluación (opcional)</label>
+                        <input type="text" id="nuevaEspecificacion" placeholder="Ej: 1 eval, 2 eval, 3 trimestre, Proyecto...">
+                        <small style="color:#64748b; display:block; margin-top:5px;">📌 Esto se añadirá al título pero NO afectará a la signatura</small>
                     </div>
                     
                     <div><label>Editorial</label>
@@ -2497,21 +2501,14 @@
             const curso = document.getElementById('nuevoCurso').value;
             const materiaSelect = document.getElementById('nuevoMateria');
             const materiaTexto = materiaSelect.value;
-            const materiaInput = document.getElementById('nuevaMateriaInput').value;
-            const materiaFinal = materiaInput || materiaTexto;
             
             const codigoCurso = codigosCurso[curso] || '';
             let codigoMateria = '';
             
-            if (materiaFinal) {
-                const materiaEncontrada = materiasPredefinidas.find(m => m.nombre === materiaFinal);
+            if (materiaTexto) {
+                const materiaEncontrada = materiasPredefinidas.find(m => m.nombre === materiaTexto);
                 if (materiaEncontrada) {
                     codigoMateria = materiaEncontrada.codigo;
-                } else {
-                    // Si es una materia nueva, usar el siguiente código (40 en adelante)
-                    const ultimoCodigo = materiasPredefinidas[materiasPredefinidas.length - 1].codigo;
-                    const siguienteNumero = parseInt(ultimoCodigo) + 1;
-                    codigoMateria = siguienteNumero.toString().padStart(2, '0');
                 }
             }
             
@@ -2522,7 +2519,6 @@
         // Eventos para actualizar signatura
         document.getElementById('nuevoCurso').addEventListener('change', actualizarSignatura);
         document.getElementById('nuevoMateria').addEventListener('change', actualizarSignatura);
-        document.getElementById('nuevaMateriaInput').addEventListener('input', actualizarSignatura);
         
         // Mostrar/ocultar buscador de donante según origen
         document.getElementById('nuevoOrigen').addEventListener('change', function() {
@@ -2578,12 +2574,6 @@
             resultadoDiv.innerHTML = htmlResult;
         };
         
-        // Función global para seleccionar donante
-        window.seleccionarDonante = (id, texto) => {
-            document.getElementById('donanteId').value = id;
-            document.getElementById('resultadoDonante').innerHTML = `<p>✅ Donante seleccionado: ${texto}</p>`;
-        };
-        
         // Añadir nuevas editoriales
         document.getElementById('nuevaEditorialInput').addEventListener('change', function() {
             if(this.value) {
@@ -2598,7 +2588,8 @@
         
         document.getElementById('guardarNuevoLibroBtn').onclick = async () => {
             const curso = document.getElementById('nuevoCurso').value;
-            const materia = document.getElementById('nuevoMateria').value || document.getElementById('nuevaMateriaInput').value;
+            const materia = document.getElementById('nuevoMateria').value;
+            const especificacion = document.getElementById('nuevaEspecificacion').value;
             const editorial = document.getElementById('nuevoEditorial').value || document.getElementById('nuevaEditorialInput').value;
             const estado = document.getElementById('nuevoEstado').value;
             const origen = document.getElementById('nuevoOrigen').value;
@@ -2613,10 +2604,6 @@
                 const materiaEncontrada = materiasPredefinidas.find(m => m.nombre === materia);
                 if (materiaEncontrada) {
                     codigoMateria = materiaEncontrada.codigo;
-                } else {
-                    const ultimoCodigo = materiasPredefinidas[materiasPredefinidas.length - 1].codigo;
-                    const siguienteNumero = parseInt(ultimoCodigo) + 1;
-                    codigoMateria = siguienteNumero.toString().padStart(2, '0');
                 }
             }
             
@@ -2630,8 +2617,14 @@
                 return;
             }
             
+            // Construir la signatura (SOLO con la materia base, sin la especificación)
             const signatura = `${codigoCurso}-${codigoMateria}-${sigEjemplar.padStart(3, '0')}`;
-            const titulo = `${materia} ${curso}`;
+            
+            // Construir el título (materia + especificación si existe)
+            let titulo = materia;
+            if (especificacion && especificacion.trim() !== '') {
+                titulo = `${materia} (${especificacion.trim()})`;
+            }
             
             const libroData = {
                 codigo_barras: codigo,
