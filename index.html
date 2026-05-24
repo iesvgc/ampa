@@ -692,7 +692,15 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
-                        <div><label>Grupo</label><input type="text" id="searchGrupo" placeholder="Ej: A, B, C"></div>
+                        <div><label>Grupo</label>
+                            <select id="searchGrupo">
+                                <option value="">Todos</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
                         <div><label>Código de usuario</label><input type="text" id="searchCodigo" placeholder="Ej: 202670001"></div>
                     </div>
                     <button id="btnBuscar" style="margin-top:10px;">Buscar</button>
@@ -815,7 +823,15 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
-                        <div><label>Grupo</label><input type="text" id="entregarGrupo" placeholder="Ej: A, B, C"></div>
+                        <div><label>Grupo</label>
+                            <select id="entregarGrupo">
+                                <option value="">Todos</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
                         <div><label>Código de usuario</label><input type="text" id="entregarCodigo" placeholder="Ej: 202670001"></div>
                     </div>
                     <button id="btnEntregarBuscar">Buscar alumnos</button>
@@ -2056,7 +2072,15 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
-                        <div><label>Grupo</label><input type="text" id="socioGrupo" placeholder="Ej: A, B, C"></div>
+                        <div><label>Grupo</label>
+                            <select id="socioGrupo">
+                                <option value="">Todos</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
                         <div><label>Código de usuario</label><input type="text" id="socioCodigo" placeholder="Ej: 202670001"></div>
                         <div><label>Filtrar socios</label><select id="socioEstado">
                             <option value="">Todos</option>
@@ -3124,7 +3148,15 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
-                        <div><label>Grupo</label><input type="text" id="prepararGrupo" placeholder="Ej: A, B, C"></div>
+                        <div><label>Grupo</label>
+                            <select id="prepararGrupo">
+                                <option value="">Todos</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
                         <div><label>Código de usuario</label><input type="text" id="prepararCodigo" placeholder="Ej: 202670001"></div>
                     </div>
                     <button id="btnPrepararBuscar">Buscar alumnos</button>
@@ -4371,6 +4403,7 @@
             const filtrosDiv = document.getElementById('filtrosDinamicos');
             
             if (tipo.startsWith('alumnos')) {
+
                 filtrosDiv.innerHTML = `
                     <div class="form-grid">
                         <div><label>Curso</label><select id="filtroCursoInforme">
@@ -4378,7 +4411,15 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
-                        <div><label>Grupo</label><input type="text" id="filtroGrupoInforme" placeholder="Ej: A, B, C"></div>
+                        <div><label>Grupo</label>
+                            <select id="filtroGrupoInforme">
+                                <option value="">Todos</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
                     </div>
                 `;
             } else {
