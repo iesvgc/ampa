@@ -5618,12 +5618,17 @@
                 .from('historial_alumnos')
                 .select('*, alumnos(*)')
                 .eq('ano_academico_id', anoId)
-                .or('socio_ampa.eq.true,beca.eq.true');  // ← Clave: socios O becados
+                .or('socio_ampa.eq.true,beca.eq.true');
             
             if (curso) query = query.eq('curso', curso);
             if (grupo) query = query.eq('grupo', grupo);
             
             const { data: alumnos } = await query;
+            
+            if (!alumnos || alumnos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay alumnos becados o socios del AMPA</p>';
+                return;
+            }
             
             // Filtrar los que NO tienen préstamos activos (lote preparado)
             const { data: prestamosActivos } = await supabase
@@ -5640,28 +5645,40 @@
                 return;
             }
             
+            // Generar tabla exactamente igual al resto de listados
             let html = `<h3>💰 Alumnos becados o del AMPA sin lotes preparados (${filtrados.length})</h3>
                 <div style="overflow-x:auto;">
                     <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                         <thead><tr style="background:#2563eb; color:white;">
-                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                            <th>Teléfono</th><th>Beca</th><th>Socio AMPA</th>
-                        </table></thead>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Apellidos</th>
+                            <th>Curso</th>
+                            <th>Grupo</th>
+                            <th>Teléfono</th>
+                            <th>Beca</th>
+                            <th>Socio AMPA</th>
+                        </tr></thead>
                         <tbody>`;
             
             for (const a of filtrados) {
                 html += `<tr>
-                    <td>${a.alumnos.codigo_usuario || '-'}</td>
-                    <td>${a.alumnos.nombre || ''}</td>
-                    <td>${a.alumnos.apellidos || ''}</td>
-                    <td>${a.curso || '-'}</td>
-                    <td>${a.grupo || '-'}</td>
-                    <td>${a.telefono || '-'}</td>
-                    <td style="text-align:center">${a.beca ? '✅' : '❌'}</td>
-                    <td style="text-align:center">${a.socio_ampa ? '✅' : '❌'}</td>
+                    <td style="padding:8px;">${a.alumnos.codigo_usuario || '-'}</td>
+                    <td style="padding:8px;">${a.alumnos.nombre || ''}</td>
+                    <td style="padding:8px;">${a.alumnos.apellidos || ''}</td>
+                    <td style="padding:8px;">${a.curso || '-'}</td>
+                    <td style="padding:8px;">${a.grupo || '-'}</td>
+                    <td style="padding:8px;">${a.telefono || '-'}</td>
+                    <td style="padding:8px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
+                    <td style="padding:8px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
                 </tr>`;
             }
-            html += `</tbody></table></div>`;
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
             resultadosDiv.innerHTML = html;
             return;
         }
