@@ -146,6 +146,7 @@
             <button id="btnPromocionarCurso" style="background:#8b5cf6;">🎓 Promocionar curso</button>
             <button id="btnBackupExcel" style="background:#10b981;">💾 Copia de seguridad</button>
             <button id="btnRestoreSQL" style="background:#f59e0b;">🔄 Restaurar backup</button>
+            <button id="btnAyuda" style="background:#8b5cf6;">❓ Ayuda / Manual</button>
         </div>
     </div>
     <div class="nav-tabs">
@@ -313,7 +314,15 @@
         if (btnPromocionar) btnPromocionar.onclick = mostrarPromocionCurso;
 
         const btnMarcarActivo = document.getElementById('btnMarcarActivo');
-        if (btnMarcarActivo) btnMarcarActivo.onclick = marcarAnoActivo;        
+        if (btnMarcarActivo) btnMarcarActivo.onclick = marcarAnoActivo; 
+        const btnAyuda = document.getElementById('btnAyuda');
+        if (btnAyuda) {
+            btnAyuda.onclick = () => {
+                window.open('https://raw.githubusercontent.com/iesvgc/ampa/main/%F0%9F%93%9A%20MANUAL%20DE%20USUARIO%20libros%20AMPA.pdf', '_blank');
+            };
+        }
+
+        
         const btnAdminToggle = document.getElementById('btnAdminToggle');
         const adminMenu = document.getElementById('adminMenuOpciones');
         if (btnAdminToggle) {
