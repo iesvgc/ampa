@@ -2142,91 +2142,122 @@
         
         const nombreBusq = normalizarTexto(nombreRaw);
         const apellidosBusq = normalizarTexto(apellidosRaw);
+        const grupoFiltro = document.getElementById('socioGrupo')?.value.trim() || '';
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        const { data: historiales, error } = await supabaseDebug
+        // ========== 1. Obtener TODOS los alumnos con su estado socio_ampa directamente ==========
+        let query = supabase
             .from('historial_alumnos')
             .select('*, alumnos(*)')
             .eq('activo', true)
             .eq('ano_academico_id', anoId);
+        
+        if (cursoFiltro) query = query.eq('curso', cursoFiltro);
+        if (grupoFiltro) query = query.eq('grupo', grupoFiltro);
+        
+        const { data: historiales, error } = await query;
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
             return;
         }
         
-        let resultados = historiales.map(h => ({
-            id: h.alumnos.id,
-            nombre: h.alumnos.nombre,
-            apellidos: h.alumnos.apellidos,
-            codigo_usuario: h.alumnos.codigo_usuario,
-            curso: h.curso,
-            grupo: h.grupo,
-            beca: h.beca,
-            socio_ampa: h.socio_ampa,
-            telefono: h.telefono,
-            bilingue: h.bilingue,
-            diversificacion: h.diversificacion
-        }));
+        if (!historiales || historiales.length === 0) {
+            resultadosDiv.innerHTML = '<p>No hay alumnos en el año académico actual</p>';
+            return;
+        }
         
-        // Filtros básicos
+        // ========== 2. Obtener los números de socio de TODOS los socios activos ==========
+        const { data: sociosData } = await supabase
+            .from('socios')
+            .select('alumno_id, n_socio')
+            .eq('ano_academico_id', anoId)
+            .eq('activo', true);
+        
+        // Crear un mapa para saber qué alumnos son socios y su número
+        const socioMap = new Map();
+        for (const s of sociosData || []) {
+            socioMap.set(s.alumno_id, s.n_socio);
+        }
+        
+        // ========== 3. Construir resultados con estado socio CORRECTO ==========
+        let resultados = [];
+        for (const h of historiales) {
+            const alumnoId = h.alumnos.id;
+            const esSocio = socioMap.has(alumnoId);  // ← ESTO ES LO CORRECTO
+            
+            resultados.push({
+                id: alumnoId,
+                nombre: h.alumnos.nombre || '',
+                apellidos: h.alumnos.apellidos || '',
+                codigo_usuario: h.alumnos.codigo_usuario || '-',
+                curso: h.curso || '-',
+                grupo: h.grupo || '-',
+                beca: h.beca,
+                telefono: h.telefono || '-',
+                bilingue: h.bilingue,
+                diversificacion: h.diversificacion,
+                socio_ampa: esSocio,        // ← Usamos el mapa, no el campo de historial
+                n_socio: socioMap.get(alumnoId) || null
+            });
+        }
+        
+        // ========== 4. Aplicar filtros de texto ==========
         if (codigoRaw) {
-            resultados = resultados.filter(a => String(a.codigo_usuario || '').includes(codigoRaw));
+            resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
         }
         if (nombreBusq) {
-            resultados = resultados.filter(a => normalizarTexto(a.nombre || '').includes(nombreBusq));
+            resultados = resultados.filter(a => normalizarTexto(a.nombre).includes(nombreBusq));
         }
         if (apellidosBusq) {
-            resultados = resultados.filter(a => normalizarTexto(a.apellidos || '').includes(apellidosBusq));
+            resultados = resultados.filter(a => normalizarTexto(a.apellidos).includes(apellidosBusq));
         }
         if (cursoFiltro) {
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
-        const grupoFiltro = document.getElementById('socioGrupo')?.value.trim();
         if (grupoFiltro) {
             resultados = resultados.filter(a => a.grupo === grupoFiltro);
-        }        
-        
-        // OPTIMIZACIÓN: Una sola consulta para todos los socios
-        const idsAlumnos = resultados.map(a => a.id);
-        const { data: socios } = await supabaseDebug
-            .from('socios')
-            .select('alumno_id, n_socio')
-            .in('alumno_id', idsAlumnos)
-            .eq('ano_academico_id', anoId)
-            .eq('activo', true);
-        
-        const socioMap = {};
-        for (const s of socios || []) {
-            socioMap[s.alumno_id] = s.n_socio;
         }
         
-        for (const alumno of resultados) {
-            alumno.n_socio = socioMap[alumno.id] || null;
-        }
-        
-        // Filtrar por estado socio
+        // ========== 5. Aplicar filtro por estado socio ==========
+        let resultadosFiltrados = resultados;
         if (estadoFiltro === 'socio') {
-            resultados = resultados.filter(a => a.socio_ampa === true);
+            resultadosFiltrados = resultados.filter(a => a.socio_ampa === true);
+        } else if (estadoFiltro === 'no_socio') {
+            resultadosFiltrados = resultados.filter(a => a.socio_ampa === false);
         }
+        // Si estadoFiltro === '' (Todos), no filtramos
         
-        if (resultados.length === 0) {
+        if (resultadosFiltrados.length === 0) {
             resultadosDiv.innerHTML = '<p>No se encontraron alumnos</p>';
             return;
         }
         
-        let html = `<h3>Resultados (${resultados.length})</h3>`;
+        // ========== 6. Mostrar resultados ==========
+        let html = `<h3>Resultados (${resultadosFiltrados.length})</h3>`;
         
-        for (const alumno of resultados) {
+        // Contar cuántos socios y no socios hay en los resultados filtrados
+        const totalSocios = resultadosFiltrados.filter(a => a.socio_ampa === true).length;
+        const totalNoSocios = resultadosFiltrados.filter(a => a.socio_ampa === false).length;
+        
+        html += `<div style="margin-bottom:10px; font-size:0.8rem; color:#64748b;">
+            📊 <strong>Resumen:</strong> ${totalSocios} socios | ${totalNoSocios} no socios | Total: ${resultadosFiltrados.length}
+        </div>`;
+        
+        for (const alumno of resultadosFiltrados) {
             const esSocio = alumno.socio_ampa === true;
+            const socioText = esSocio ? '✅ Socio AMPA' : '❌ No es socio';
+            const socioColor = esSocio ? '#10b981' : '#dc2626';
+            
             html += `
                 <div class="alumno-row">
                     <div class="alumno-info">
-                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
-                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
-                        ${esSocio ? '✅ Socio AMPA' : '❌ No es socio'}
+                        <strong>${alumno.nombre} ${alumno.apellidos}</strong><br>
+                        📋 Código: ${alumno.codigo_usuario} | Curso: ${alumno.curso} ${alumno.grupo}<br>
+                        <span style="color:${socioColor}; font-weight:bold;">${socioText}</span>
                         ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio}` : ''}
+                        ${alumno.beca ? '<br>🎓 Becado' : ''}
                     </div>
                     <div class="alumno-actions">
                         ${!esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
