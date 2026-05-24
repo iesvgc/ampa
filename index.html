@@ -4961,22 +4961,206 @@
     }
     
     function exportarAPDF() {
-        const tabla = document.querySelector('#resultadoListado table');
-        if (!tabla) {
+        const resultadosDiv = document.getElementById('resultadoListado');
+        if (!resultadosDiv) {
             alert('Primero genera un listado');
             return;
         }
+        
+        // Obtener el título del listado actual (desde el H3 que se genera)
+        const tituloListado = document.querySelector('#resultadoListado h3')?.innerHTML || 'Listado';
+        
+        // Obtener filtros seleccionados para mostrarlos en el PDF
+        const tipoListado = document.getElementById('tipoListado');
+        const nombreListado = tipoListado?.options[tipoListado.selectedIndex]?.text || 'Búsqueda Rápida';
+        
+        const cursoFiltro = document.getElementById('filtroCursoInforme')?.value || '';
+        const grupoFiltro = document.getElementById('filtroGrupoInforme')?.value || '';
+        
+        let filtrosTexto = '';
+        if (cursoFiltro) filtrosTexto += `Curso: ${cursoFiltro} `;
+        if (grupoFiltro) filtrosTexto += `Grupo: ${grupoFiltro} `;
+        if (cursoFiltro === '' && grupoFiltro === '') filtrosTexto = 'Todos los cursos y grupos';
+        
+        // Clonar la tabla para no modificar la original
+        const tablaOriginal = resultadosDiv.querySelector('table');
+        if (!tablaOriginal) {
+            alert('No hay datos para exportar a PDF');
+            return;
+        }
+        
+        const tablaClonada = tablaOriginal.cloneNode(true);
+        
+        // Limpiar botones e inputs dentro de la tabla clonada
+        const botones = tablaClonada.querySelectorAll('button, .btn, input, select, .edit-icon');
+        botones.forEach(btn => btn.remove());
+        
+        // Dar formato a las celdas de la tabla clonada
+        const celdas = tablaClonada.querySelectorAll('td, th');
+        celdas.forEach(celda => {
+            celda.style.padding = '8px';
+            celda.style.border = '1px solid #cbd5e1';
+            celda.style.fontSize = '11px';
+        });
+        
+        const encabezados = tablaClonada.querySelectorAll('th');
+        encabezados.forEach(th => {
+            th.style.backgroundColor = '#2563eb';
+            th.style.color = 'white';
+            th.style.fontWeight = 'bold';
+        });
+        
+        // Obtener el año académico actual
+        const selectAno = document.getElementById('selectAnoAcademico');
+        const anoTexto = selectAno?.options[selectAno.selectedIndex]?.text || 'Año actual';
+        
+        // Fecha actual formateada
+        const fechaActual = new Date().toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // Contar filas de la tabla (excluyendo encabezado)
+        const filas = tablaClonada.querySelectorAll('tbody tr');
+        const totalRegistros = filas.length;
+        
+        // Crear el HTML completo para el PDF
         const ventana = window.open('', '_blank');
         ventana.document.write(`
+            <!DOCTYPE html>
             <html>
-            <head><title>Listado</title>
-            <style>table,th,td{border:1px solid black;border-collapse:collapse;padding:8px;}</style>
+            <head>
+                <meta charset="UTF-8">
+                <title>${nombreListado} - ${filtrosTexto}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        padding: 30px;
+                        background: white;
+                        color: #1e293b;
+                        font-size: 12px;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 25px;
+                        padding-bottom: 15px;
+                        border-bottom: 3px solid #2563eb;
+                    }
+                    .header h1 {
+                        color: #1e40af;
+                        font-size: 22px;
+                        margin-bottom: 5px;
+                    }
+                    .header p {
+                        color: #64748b;
+                        font-size: 12px;
+                        margin: 3px 0;
+                    }
+                    .titulo-listado {
+                        background: #f8fafc;
+                        padding: 12px 15px;
+                        border-radius: 8px;
+                        margin: 15px 0;
+                        border-left: 5px solid #2563eb;
+                    }
+                    .titulo-listado h2 {
+                        color: #1e293b;
+                        font-size: 16px;
+                        margin: 0;
+                    }
+                    .titulo-listado p {
+                        color: #64748b;
+                        font-size: 11px;
+                        margin-top: 5px;
+                    }
+                    .filtros-info {
+                        background: #f1f5f9;
+                        padding: 10px 15px;
+                        border-radius: 8px;
+                        margin: 15px 0;
+                        font-size: 11px;
+                        display: flex;
+                        justify-content: space-between;
+                        flex-wrap: wrap;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 15px 0;
+                        font-size: 10px;
+                    }
+                    th, td {
+                        border: 1px solid #cbd5e1;
+                        padding: 8px;
+                        text-align: left;
+                        vertical-align: top;
+                    }
+                    th {
+                        background: #2563eb;
+                        color: white;
+                        font-weight: bold;
+                    }
+                    .footer {
+                        margin-top: 30px;
+                        text-align: center;
+                        font-size: 9px;
+                        color: #94a3b8;
+                        border-top: 1px solid #e2e8f0;
+                        padding-top: 15px;
+                    }
+                    .total-registros {
+                        margin-top: 10px;
+                        text-align: right;
+                        font-size: 10px;
+                        font-weight: bold;
+                        color: #1e40af;
+                    }
+                    @media print {
+                        body { padding: 20px; }
+                        .no-print { display: none; }
+                    }
+                </style>
             </head>
-            <body>${tabla.outerHTML}</body>
+            <body>
+                <div class="no-print" style="text-align:center; padding:15px; background:#f0f2f5; margin-bottom:20px; border-radius:8px;">
+                    <button onclick="window.print()" style="background:#2563eb; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; margin:0 5px;">🖨️ Imprimir / Guardar como PDF</button>
+                    <button onclick="window.close()" style="background:#64748b; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; margin:0 5px;">✖ Cerrar</button>
+                </div>
+                
+                <div class="header">
+                    <h1>📚 INSTITUTO VICTOR GARCÍA DE LA CONCHA</h1>
+                    <p>Villaviciosa - Banco de Libros</p>
+                    <p>Año Académico: ${anoTexto}</p>
+                </div>
+                
+                <div class="titulo-listado">
+                    <h2>📄 ${nombreListado}</h2>
+                    <p>Generado el: ${fechaActual}</p>
+                </div>
+                
+                <div class="filtros-info">
+                    <span><strong>🎯 Filtros aplicados:</strong> ${filtrosTexto}</span>
+                    <span><strong>📊 Total de registros:</strong> ${totalRegistros}</span>
+                </div>
+                
+                ${tablaClonada.outerHTML}
+                
+                <div class="total-registros">
+                    Total: ${totalRegistros} registro${totalRegistros !== 1 ? 's' : ''}
+                </div>
+                
+                <div class="footer">
+                    <p>Instituto Victor García de la Concha - Villaviciosa | Banco de Libros</p>
+                    <p>Documento generado automáticamente - Fecha: ${fechaActual}</p>
+                </div>
+            </body>
             </html>
         `);
         ventana.document.close();
-        ventana.print();
     }
     async function generarListadoAvanzado() {
         const tipo = document.getElementById('tipoListado').value;
