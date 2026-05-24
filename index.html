@@ -4692,11 +4692,18 @@
                 <div class="search-filters">
                     <div class="form-grid">
                         <div><label>Tipo de listado</label><select id="tipoListado">
+
                             <optgroup label="👨‍🎓 ALUMNOS">
                                 <option value="alumnos_pendientes">📚 Alumnos con libros pendientes de devolver</option>
                                 <option value="alumnos_lotes_preparados">📦 Alumnos con lotes preparados</option>
-                                <option value="alumnos_ampa_sin_lote">💰 Alumnos del AMPA sin lotes preparados</option>
+                                <option value="alumnos_ampa_beca_sin_lote">💰 Alumnos becados o del AMPA sin lotes preparados</option>
                                 <option value="alumnos_general">📋 Listado general de alumnos</option>
+                                <option value="alumnos_bilingues">🌍 Alumnos bilingües</option>
+                                <option value="alumnos_diversificacion">🎯 Alumnos en diversificación</option>
+                                <option value="alumnos_solo_beca">🎓 Alumnos con beca</option>
+                                <option value="alumnos_solo_socios">💰 Alumnos socios del AMPA</option>
+                                <option value="alumnos_donantes">📦 Alumnos donantes</option>
+                                <option value="alumnos_observaciones">⚠️ Alumnos con observaciones</option>
                             </optgroup>
                             <optgroup label="📖 BIBLIOTECA">
                                 <option value="libros_catalogo">📚 Catálogo general de libros</option>
@@ -5363,9 +5370,127 @@
             resultadosDiv.innerHTML = html;
             return;
         }
+        if (tipo === 'alumnos_bilingues') {
+            let query = supabase
+                .from('historial_alumnos')
+                .select('*, alumnos(*)')
+                .eq('ano_academico_id', anoId)
+                .eq('bilingue', true);
+            
+            if (curso) query = query.eq('curso', curso);
+            if (grupo) query = query.eq('grupo', grupo);
+            
+            const { data: alumnos } = await query;
+            
+            if (!alumnos || alumnos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay alumnos bilingües</p>';
+                return;
+            }
+            
+            let html = `<h3>🌍 Alumnos bilingües (${alumnos.length})</h3>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <thead><tr style="background:#2563eb; color:white;">
+                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th><th>Teléfono</th>
+                        </tr></thead>
+                        <tbody>`;
+            
+            for (const a of alumnos) {
+                html += `<tr>
+                    <td>${a.alumnos.codigo_usuario || '-'}</td>
+                    <td>${a.alumnos.nombre || ''}</td>
+                    <td>${a.alumnos.apellidos || ''}</td>
+                    <td>${a.curso || '-'}</td>
+                    <td>${a.grupo || '-'}</td>
+                    <td>${a.telefono || '-'}</td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+            resultadosDiv.innerHTML = html;
+            return;
+        }
         
-        if (tipo === 'alumnos_ampa_sin_lote') {
-            // Socios AMPA que NO tienen lote preparado
+        if (tipo === 'alumnos_diversificacion') {
+            let query = supabase
+                .from('historial_alumnos')
+                .select('*, alumnos(*)')
+                .eq('ano_academico_id', anoId)
+                .eq('diversificacion', true);
+            
+            if (curso) query = query.eq('curso', curso);
+            if (grupo) query = query.eq('grupo', grupo);
+            
+            const { data: alumnos } = await query;
+            
+            if (!alumnos || alumnos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay alumnos en diversificación</p>';
+                return;
+            }
+            
+            let html = `<h3>🎯 Alumnos en diversificación (${alumnos.length})</h3>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <thead><tr style="background:#2563eb; color:white;">
+                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th><th>Teléfono</th>
+                        </tr></thead>
+                        <tbody>`;
+            
+            for (const a of alumnos) {
+                html += `<tr>
+                    <td>${a.alumnos.codigo_usuario || '-'}</td>
+                    <td>${a.alumnos.nombre || ''}</td>
+                    <td>${a.alumnos.apellidos || ''}</td>
+                    <td>${a.curso || '-'}</td>
+                    <td>${a.grupo || '-'}</td>
+                    <td>${a.telefono || '-'}</td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+            resultadosDiv.innerHTML = html;
+            return;
+        }
+        
+        if (tipo === 'alumnos_solo_beca') {
+            let query = supabase
+                .from('historial_alumnos')
+                .select('*, alumnos(*)')
+                .eq('ano_academico_id', anoId)
+                .eq('beca', true);
+            
+            if (curso) query = query.eq('curso', curso);
+            if (grupo) query = query.eq('grupo', grupo);
+            
+            const { data: alumnos } = await query;
+            
+            if (!alumnos || alumnos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay alumnos con beca</p>';
+                return;
+            }
+            
+            let html = `<h3>🎓 Alumnos con beca (${alumnos.length})</h3>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <thead><tr style="background:#2563eb; color:white;">
+                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th><th>Teléfono</th>
+                        </tr></thead>
+                        <tbody>`;
+            
+            for (const a of alumnos) {
+                html += `<tr>
+                    <td>${a.alumnos.codigo_usuario || '-'}</td>
+                    <td>${a.alumnos.nombre || ''}</td>
+                    <td>${a.alumnos.apellidos || ''}</td>
+                    <td>${a.curso || '-'}</td>
+                    <td>${a.grupo || '-'}</td>
+                    <td>${a.telefono || '-'}</td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+            resultadosDiv.innerHTML = html;
+            return;
+        }
+        
+        if (tipo === 'alumnos_solo_socios') {
             let query = supabase
                 .from('historial_alumnos')
                 .select('*, alumnos(*)')
@@ -5377,7 +5502,130 @@
             
             const { data: alumnos } = await query;
             
-            // Filtrar los que NO tienen préstamos activos
+            if (!alumnos || alumnos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay alumnos socios del AMPA</p>';
+                return;
+            }
+            
+            let html = `<h3>💰 Alumnos socios del AMPA (${alumnos.length})</h3>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <thead><tr style="background:#2563eb; color:white;">
+                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th><th>Teléfono</th>
+                        </tr></thead>
+                        <tbody>`;
+            
+            for (const a of alumnos) {
+                html += `<tr>
+                    <td>${a.alumnos.codigo_usuario || '-'}</td>
+                    <td>${a.alumnos.nombre || ''}</td>
+                    <td>${a.alumnos.apellidos || ''}</td>
+                    <td>${a.curso || '-'}</td>
+                    <td>${a.grupo || '-'}</td>
+                    <td>${a.telefono || '-'}</td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+            resultadosDiv.innerHTML = html;
+            return;
+        }
+        
+        if (tipo === 'alumnos_donantes') {
+            let query = supabase
+                .from('historial_alumnos')
+                .select('*, alumnos(*)')
+                .eq('ano_academico_id', anoId)
+                .eq('donante', true);
+            
+            if (curso) query = query.eq('curso', curso);
+            if (grupo) query = query.eq('grupo', grupo);
+            
+            const { data: alumnos } = await query;
+            
+            if (!alumnos || alumnos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay alumnos donantes</p>';
+                return;
+            }
+            
+            let html = `<h3>📦 Alumnos donantes (${alumnos.length})</h3>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <thead><tr style="background:#2563eb; color:white;">
+                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th><th>Teléfono</th>
+                        </td></thead>
+                        <tbody>`;
+            
+            for (const a of alumnos) {
+                html += `<tr>
+                    <td>${a.alumnos.codigo_usuario || '-'}</td>
+                    <td>${a.alumnos.nombre || ''}</td>
+                    <td>${a.alumnos.apellidos || ''}</td>
+                    <td>${a.curso || '-'}</td>
+                    <td>${a.grupo || '-'}</td>
+                    <td>${a.telefono || '-'}</td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+            resultadosDiv.innerHTML = html;
+            return;
+        }
+        
+        if (tipo === 'alumnos_observaciones') {
+            let query = supabase
+                .from('historial_alumnos')
+                .select('*, alumnos(*)')
+                .eq('ano_academico_id', anoId)
+                .not('observaciones', 'is', null)
+                .neq('observaciones', '');
+            
+            if (curso) query = query.eq('curso', curso);
+            if (grupo) query = query.eq('grupo', grupo);
+            
+            const { data: alumnos } = await query;
+            
+            if (!alumnos || alumnos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay alumnos con observaciones</p>';
+                return;
+            }
+            
+            let html = `<h3>⚠️ Alumnos con observaciones (${alumnos.length})</h3>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <thead><tr style="background:#2563eb; color:white;">
+                            <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
+                            <th>Observaciones</th>
+                        </tr></thead>
+                        <tbody>`;
+            
+            for (const a of alumnos) {
+                html += `<tr>
+                    <td>${a.alumnos.codigo_usuario || '-'}</td>
+                    <td>${a.alumnos.nombre || ''}</td>
+                    <td>${a.alumnos.apellidos || ''}</td>
+                    <td>${a.curso || '-'}</td>
+                    <td>${a.grupo || '-'}</td>
+                    <td style="max-width:200px;">${(a.observaciones || '').substring(0, 100)}${(a.observaciones || '').length > 100 ? '...' : ''}</td>
+                </tr>`;
+            }
+            html += `</tbody><table></div>`;
+            resultadosDiv.innerHTML = html;
+            return;
+        }        
+
+        if (tipo === 'alumnos_ampa_beca_sin_lote') {
+            // Socios AMPA O becados que NO tienen lote preparado
+            let query = supabase
+                .from('historial_alumnos')
+                .select('*, alumnos(*)')
+                .eq('ano_academico_id', anoId)
+                .or('socio_ampa.eq.true,beca.eq.true');  // ← Clave: socios O becados
+            
+            if (curso) query = query.eq('curso', curso);
+            if (grupo) query = query.eq('grupo', grupo);
+            
+            const { data: alumnos } = await query;
+            
+            // Filtrar los que NO tienen préstamos activos (lote preparado)
             const { data: prestamosActivos } = await supabase
                 .from('prestamos')
                 .select('alumno_id')
@@ -5388,17 +5636,17 @@
             const filtrados = alumnos.filter(a => !alumnosConPrestamos.has(a.alumnos.id));
             
             if (filtrados.length === 0) {
-                resultadosDiv.innerHTML = '<p>No hay socios AMPA sin lotes preparados</p>';
+                resultadosDiv.innerHTML = '<p>No hay alumnos becados o socios del AMPA sin lotes preparados</p>';
                 return;
             }
             
-            let html = `<h3>💰 Socios AMPA sin lotes preparados (${filtrados.length})</h3>
+            let html = `<h3>💰 Alumnos becados o del AMPA sin lotes preparados (${filtrados.length})</h3>
                 <div style="overflow-x:auto;">
                     <table class="data-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                         <thead><tr style="background:#2563eb; color:white;">
                             <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
-                            <th>Teléfono</th>
-                        </tr></thead>
+                            <th>Teléfono</th><th>Beca</th><th>Socio AMPA</th>
+                        </table></thead>
                         <tbody>`;
             
             for (const a of filtrados) {
@@ -5409,6 +5657,8 @@
                     <td>${a.curso || '-'}</td>
                     <td>${a.grupo || '-'}</td>
                     <td>${a.telefono || '-'}</td>
+                    <td style="text-align:center">${a.beca ? '✅' : '❌'}</td>
+                    <td style="text-align:center">${a.socio_ampa ? '✅' : '❌'}</td>
                 </tr>`;
             }
             html += `</tbody></table></div>`;
