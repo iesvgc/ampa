@@ -3297,6 +3297,11 @@
     }
     
     function mostrarTablaResultadosPreparar(resultados, resultadosDiv) {
+        // Separar y ordenar: primero los que son socios AMPA O tienen beca, luego los que no
+        const aptos = resultados.filter(a => a.socio_ampa === true || a.beca === true);
+        const noAptos = resultados.filter(a => a.socio_ampa !== true && a.beca !== true);
+        const resultadosOrdenados = [...aptos, ...noAptos];
+        
         let html = `<h3>Resultados (${resultados.length})</h3>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem; min-width:800px;">
@@ -3311,12 +3316,21 @@
                         <th style="padding:6px;">Libros</th>
                         <th style="padding:6px;">Estado</th>
                         <th style="padding:6px;">Acción</th>
-                    </tr></thead>
+                      </tr>
+                    </thead>
                     <tbody>`;
         
-        for (const a of resultados) {
+        for (const a of resultadosOrdenados) {
+            const esApto = (a.socio_ampa === true || a.beca === true);
+            const colorFila = esApto ? 'style="background:#dcfce7;"' : 'style="background:#ffffff;"';
+            
+            // Si no es apto, usar la función con advertencia
+            const onclickAction = !esApto 
+                ? `onclick="prepararLoteConAdvertencia(${a.id}, '${a.nombre.replace(/'/g, "\\'")}')"` 
+                : `onclick="seleccionarAlumnoPrepararConEstado(${a.id})"`;
+            
             html += `
-                <tr style="border-bottom:1px solid #ddd;">
+                <tr style="border-bottom:1px solid #ddd;" ${colorFila}>
                     <td style="padding:6px;">${a.codigo_usuario || '-'}</td>
                     <td style="padding:6px;">${a.nombre}</td>
                     <td style="padding:6px;">${a.apellidos || ''}</td>
@@ -3327,15 +3341,21 @@
                     <td style="padding:6px; text-align:center;">${a.librosPrestados}</td>
                     <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
                     <td style="padding:6px;">
-                        ${!a.yaEntregado ? `<button onclick="seleccionarAlumnoPrepararConEstado(${a.id})" style="background:#10b981;">📦 Preparar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}                        
+                        ${!a.yaEntregado ? `<button ${onclickAction} style="background:#10b981;">📦 Preparar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}
                     </td>
-                </tr>
+                  </tr>
             `;
         }
         html += `</tbody></table></div>`;
         resultadosDiv.innerHTML = html;
     }
-    
+    window.prepararLoteConAdvertencia = async (alumnoId, nombre) => {
+        const confirmar = confirm(`⚠️ ATENCIÓN\n\nEl alumno ${nombre} NO es socio del AMPA ni tiene beca.\n\n¿Estás seguro de que quieres prepararle el lote de libros?`);
+        
+        if (confirmar) {
+            await window.seleccionarAlumnoPrepararConEstado(alumnoId);
+        }
+    };    
     window.seleccionarAlumnoPrepararConEstado = async (alumnoId) => {
         const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
         const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
