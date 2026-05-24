@@ -3082,8 +3082,10 @@
         let html = `
             <div class="card">
                 <h2>🔄 Gestión de Préstamos</h2>
+
                 <div class="flex">
                     <button id="btnPrepararLote" class="success">📦 Preparar lote</button>
+                    <button id="btnModificarLote" class="secondary">✏️ Modificar lote</button>
                     <button id="btnEntregarLote" class="success">✅ Entregar lote</button>
                     <button id="btnRecogerLote" class="warning">📥 Recoger lote</button>
                 </div>
@@ -3093,19 +3095,23 @@
         document.getElementById('mainPanel').innerHTML = html;
         
         // Función para resaltar botón activo
+
         function resaltarBoton(activo) {
             const btns = {
                 preparar: document.getElementById('btnPrepararLote'),
+                modificar: document.getElementById('btnModificarLote'),
                 entregar: document.getElementById('btnEntregarLote'),
                 recoger: document.getElementById('btnRecogerLote')
             };
-            btns.preparar.classList.remove('btn-prestamo-activo');
-            btns.entregar.classList.remove('btn-prestamo-activo');
-            btns.recoger.classList.remove('btn-prestamo-activo');
+            if (btns.preparar) btns.preparar.classList.remove('btn-prestamo-activo');
+            if (btns.modificar) btns.modificar.classList.remove('btn-prestamo-activo');
+            if (btns.entregar) btns.entregar.classList.remove('btn-prestamo-activo');
+            if (btns.recoger) btns.recoger.classList.remove('btn-prestamo-activo');
             
-            if (activo === 'preparar') btns.preparar.classList.add('btn-prestamo-activo');
-            else if (activo === 'entregar') btns.entregar.classList.add('btn-prestamo-activo');
-            else if (activo === 'recoger') btns.recoger.classList.add('btn-prestamo-activo');
+            if (activo === 'preparar' && btns.preparar) btns.preparar.classList.add('btn-prestamo-activo');
+            else if (activo === 'modificar' && btns.modificar) btns.modificar.classList.add('btn-prestamo-activo');
+            else if (activo === 'entregar' && btns.entregar) btns.entregar.classList.add('btn-prestamo-activo');
+            else if (activo === 'recoger' && btns.recoger) btns.recoger.classList.add('btn-prestamo-activo');
         }
         
         document.getElementById('btnPrepararLote').onclick = () => {
@@ -3116,6 +3122,10 @@
             resaltarBoton('entregar');
             mostrarEntregarLote();
         };
+        document.getElementById('btnModificarLote').onclick = () => {
+            resaltarBoton('modificar');
+            mostrarModificarLote();
+        };        
         document.getElementById('btnRecogerLote').onclick = () => {
             resaltarBoton('recoger');
             mostrarRecogerLote();
@@ -3480,7 +3490,246 @@
         alumnoSeleccionadoPreparar = null;
         mostrarPrepararLote();
     }
-    
+    async function mostrarModificarLote() {
+        let html = `
+            <div style="margin-top:20px;">
+                <h3>✏️ Modificar lote (eliminar libros de un lote preparado)</h3>
+                <div class="search-filters">
+                    <div class="form-grid">
+                        <div><label>🔍 Nombre</label><input type="text" id="modificarNombre" placeholder="Ej: María"></div>
+                        <div><label>🔍 Apellidos</label><input type="text" id="modificarApellidos" placeholder="Ej: García López"></div>
+                        <div><label>Curso</label><select id="modificarCurso">
+                            <option value="">Todos</option>
+                            <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
+                            <option>1BAC</option><option>2BAC</option>
+                        </select></div>
+                        <div><label>Grupo</label>
+                            <select id="modificarGrupo">
+                                <option value="">Todos</option>
+                                <option value="A">A</option><option value="B">B</option>
+                                <option value="C">C</option><option value="D">D</option>
+                            </select>
+                        </div>
+                        <div><label>Código de usuario</label><input type="text" id="modificarCodigo" placeholder="Ej: 202670001"></div>
+                    </div>
+                    <button id="btnModificarBuscar" style="margin-top:10px;">Buscar alumnos con lote preparado</button>
+                    <button id="btnModificarLimpiar" class="secondary" style="margin-top:10px;">Limpiar</button>
+                </div>
+                <div id="modificarResultados" class="resultados" style="margin-top:10px;"></div>
+                <div id="modificarDetallePanel" style="margin-top:20px; display:none;">
+                    <div style="border-top:1px solid #ddd; padding-top:15px;">
+                        <div id="modificarDetalleContenido"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('subpanelPrestamos').innerHTML = html;
+        
+        document.getElementById('btnModificarBuscar').onclick = () => buscarAlumnosParaModificar();
+        document.getElementById('btnModificarLimpiar').onclick = () => {
+            document.getElementById('modificarNombre').value = '';
+            document.getElementById('modificarApellidos').value = '';
+            document.getElementById('modificarCurso').value = '';
+            document.getElementById('modificarGrupo').value = '';
+            document.getElementById('modificarCodigo').value = '';
+            document.getElementById('modificarResultados').innerHTML = '';
+            document.getElementById('modificarDetallePanel').style.display = 'none';
+        };
+        
+        const inputs = ['modificarNombre', 'modificarApellidos', 'modificarCurso', 'modificarGrupo', 'modificarCodigo'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarAlumnosParaModificar(); });
+        });
+    } 
+    async function buscarAlumnosParaModificar() {
+        const nombreRaw = document.getElementById('modificarNombre').value.trim();
+        const apellidosRaw = document.getElementById('modificarApellidos').value.trim();
+        const cursoFiltro = document.getElementById('modificarCurso').value;
+        const grupoFiltro = document.getElementById('modificarGrupo').value;
+        const codigoRaw = document.getElementById('modificarCodigo').value.trim();
+        
+        const resultadosDiv = document.getElementById('modificarResultados');
+        
+        const nombreBusq = normalizarTexto(nombreRaw);
+        const apellidosBusq = normalizarTexto(apellidosRaw);
+        
+        resultadosDiv.innerHTML = '<p>Buscando...</p>';
+        
+        const anoId = currentAnoId;
+        
+        // Obtener alumnos con lote preparado (tienen préstamos activos Y lote_entregado = false)
+        const { data: prestamosActivos } = await supabase
+            .from('prestamos')
+            .select('alumno_id')
+            .eq('entregado', false)
+            .eq('ano_academico_id', anoId);
+        
+        const alumnosConPrestamos = [...new Set(prestamosActivos.map(p => p.alumno_id))];
+        
+        if (alumnosConPrestamos.length === 0) {
+            resultadosDiv.innerHTML = '<p>No hay alumnos con lotes preparados actualmente</p>';
+            return;
+        }
+        
+        let query = supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', anoId)
+            .in('alumno_id', alumnosConPrestamos)
+            .eq('lote_entregado', false);
+        
+        if (cursoFiltro) query = query.eq('curso', cursoFiltro);
+        if (grupoFiltro) query = query.eq('grupo', grupoFiltro);
+        
+        const { data: historiales, error } = await query;
+        
+        if (error) {
+            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            return;
+        }
+        
+        let resultados = [];
+        for (const h of historiales || []) {
+            resultados.push({
+                id: h.alumnos.id,
+                nombre: h.alumnos.nombre,
+                apellidos: h.alumnos.apellidos,
+                codigo_usuario: h.alumnos.codigo_usuario,
+                curso: h.curso,
+                grupo: h.grupo,
+                beca: h.beca,
+                socio_ampa: h.socio_ampa
+            });
+        }
+        
+        // Filtrar adicionalmente
+        if (codigoRaw) {
+            resultados = resultados.filter(a => String(a.codigo_usuario).includes(codigoRaw));
+        }
+        if (nombreBusq) {
+            resultados = resultados.filter(a => normalizarTexto(a.nombre).includes(nombreBusq));
+        }
+        if (apellidosBusq) {
+            resultados = resultados.filter(a => normalizarTexto(a.apellidos).includes(apellidosBusq));
+        }
+        
+        if (resultados.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron alumnos con lotes preparados</p>';
+            return;
+        }
+        
+        // Mostrar resultados
+        let html = `<h3>Alumnos con lote preparado (${resultados.length})</h3>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                    <thead><tr style="background:#2563eb; color:white;">
+                        <th>Código</th><th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th>
+                        <th>Beca</th><th>Socio</th><th></th>
+                    </tr></thead>
+                    <tbody>`;
+        
+        for (const a of resultados) {
+            html += `
+                <tr style="border-bottom:1px solid #ddd;">
+                    <td style="padding:6px;">${a.codigo_usuario || '-'}</td>
+                    <td style="padding:6px;">${a.nombre}</td>
+                    <td style="padding:6px;">${a.apellidos || ''}</td>
+                    <td style="padding:6px;">${a.curso}</td>
+                    <td style="padding:6px;">${a.grupo || ''}</td>
+                    <td style="padding:6px; text-align:center;">${a.beca ? '✅' : '❌'}</td>
+                    <td style="padding:6px; text-align:center;">${a.socio_ampa ? '✅' : '❌'}</td>
+                    <td style="padding:6px;"><button onclick="seleccionarAlumnoModificar(${a.id})">✏️ Modificar lote</button></td>
+                </tr>
+            `;
+        }
+        html += `</tbody></table></div>`;
+        resultadosDiv.innerHTML = html;
+    }
+    window.seleccionarAlumnoModificar = async (alumnoId) => {
+        const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
+        const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
+        
+        // Obtener libros del lote preparado (prestamos activos)
+        const { data: prestamos } = await supabase
+            .from('prestamos')
+            .select('*, libros(*)')
+            .eq('alumno_id', alumnoId)
+            .eq('entregado', false);
+        
+        if (!prestamos || prestamos.length === 0) {
+            alert('Este alumno no tiene libros en su lote preparado');
+            document.getElementById('modificarDetallePanel').style.display = 'none';
+            return;
+        }
+        
+        let librosHtml = `<h4>📚 Libros del lote (${prestamos.length})</h4>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                    <thead><tr style="background:#2563eb; color:white;">
+                        <th>Título</th><th>Materia</th><th>Curso</th><th>Signatura</th><th>Acción</th>
+                    </tr></thead>
+                    <tbody>`;
+        
+        for (const p of prestamos) {
+            const libro = p.libros;
+            librosHtml += `
+                <tr id="fila-prestamo-${p.id}">
+                    <td style="padding:6px;">${libro?.titulo || '-'}</td>
+                    <td style="padding:6px;">${libro?.materia || '-'}</td>
+                    <td style="padding:6px;">${libro?.curso_para || '-'}</td>
+                    <td style="padding:6px;">${libro?.signatura || '-'}</td>
+                    <td style="padding:6px;"><button onclick="eliminarLibroDelLoteModificar(${p.id}, '${libro?.titulo.replace(/'/g, "\\'")}')" style="background:#dc2626;">❌ Quitar</button></td>
+                </tr>
+            `;
+        }
+        librosHtml += `</tbody></table></div>`;
+        librosHtml += `<p style="margin-top:15px;"><small>⚠️ Al eliminar un libro, se eliminará permanentemente del lote de este alumno.</small></p>`;
+        librosHtml += `<button id="btnCerrarModificarPanel" class="secondary" style="margin-top:15px;">✖ Cerrar</button>`;
+        
+        document.getElementById('modificarDetallePanel').style.display = 'block';
+        document.getElementById('modificarDetalleContenido').innerHTML = `
+            <div class="alumno-row" style="border-left-color:#f59e0b; margin-bottom:15px;">
+                <div class="alumno-info">
+                    <strong>✏️ Alumno: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                    📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}
+                </div>
+            </div>
+            ${librosHtml}
+        `;
+        
+        document.getElementById('btnCerrarModificarPanel').onclick = () => {
+            document.getElementById('modificarDetallePanel').style.display = 'none';
+            buscarAlumnosParaModificar(); // Refrescar lista
+        };
+    };   
+    window.eliminarLibroDelLoteModificar = async (prestamoId, titulo) => {
+        const confirmar = confirm(`⚠️ ¿Eliminar el libro "${titulo}" del lote de este alumno?\n\nEsta acción no se puede deshacer.`);
+        
+        if (confirmar) {
+            const { error } = await supabase
+                .from('prestamos')
+                .delete()
+                .eq('id', prestamoId);
+            
+            if (error) {
+                alert('Error al eliminar el libro: ' + error.message);
+            } else {
+                alert(`✅ Libro "${titulo}" eliminado del lote`);
+                // Eliminar la fila visualmente
+                const fila = document.getElementById(`fila-prestamo-${prestamoId}`);
+                if (fila) fila.remove();
+                
+                // Verificar si quedan libros en la tabla
+                const tbody = document.querySelector('#modificarDetalleContenido tbody');
+                if (tbody && tbody.children.length === 0) {
+                    document.getElementById('modificarDetallePanel').style.display = 'none';
+                    buscarAlumnosParaModificar();
+                    alert('✅ El lote del alumno ha quedado vacío');
+                }
+            }
+        }
+    };    
     async function buscarAlumnoParaPrestamo() {
         const searchTerm = document.getElementById('buscarAlumnoPrestamo').value.trim();
         const resultadoDiv = document.getElementById('resultadoAlumno');
