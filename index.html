@@ -1825,13 +1825,20 @@
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
             // Validar teléfono (obligatorio, 9 dígitos)
             const telefono = document.getElementById('editTelefono').value.trim();
+            let telefonoValido = true;
+            let mensajeAdvertencia = '';
+            
             if (!telefono) {
-                alert("El teléfono es obligatorio");
-                return;
+                mensajeAdvertencia = "⚠️ El teléfono está vacío. Se guardará igualmente, pero se recomienda completarlo.";
+                telefonoValido = false;
+            } else if (!/^[0-9]{9}$/.test(telefono)) {
+                mensajeAdvertencia = "⚠️ El teléfono debe tener 9 dígitos numéricos (ej: 666123456). Se guardará igualmente, pero puede causar problemas.";
+                telefonoValido = false;
             }
-            if (!/^[0-9]{9}$/.test(telefono)) {
-                alert("El teléfono debe tener 9 dígitos numéricos (ej: 666123456)");
-                return;
+            
+            if (!telefonoValido) {
+                const confirmar = confirm(mensajeAdvertencia + "\n\n¿Quieres guardar el alumno de todas formas?");
+                if (!confirmar) return;
             }
             
             let nuevoAlumnoId = alumnoId;
