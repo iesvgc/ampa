@@ -2468,7 +2468,7 @@
             if(e.key === 'Enter') buscarLibros();
         });
     }
-    async function obtenerSiguienteEjemplar(origen) {
+    async function obtenerSiguienteEjemplar(origen, curso, materia) {
         let prefijo = '';
         let campo = 'signatura';
         
@@ -2480,6 +2480,8 @@
             .from('libros')
             .select('signatura')
             .eq('origen', origen)
+            .eq('curso_para', curso)
+            .eq('materia', materia)
             .not('signatura', 'is', null);
         
         let maxNumero = 0;
@@ -2638,7 +2640,9 @@
             
             // Sugerir número automático para AMPA o Donado
             if (origen === 'AMPA' || origen === 'Donado') {
-                const sugerido = await obtenerSiguienteEjemplar(origen);
+                const cursoActual = document.getElementById('nuevoCurso').value;
+                const materiaActual = document.getElementById('nuevoMateria').value;
+                const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
                 if (sugerido) {
                     sigEjemplar.value = sugerido;
                     ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sugerido} (puedes modificarlo)`;
