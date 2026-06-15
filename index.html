@@ -2772,6 +2772,21 @@
                 donante_id: origen === 'Donado' && donanteId ? parseInt(donanteId) : null
             };
             
+            // Verificar si ya existe un libro con la misma signatura
+            const { data: libroExistente } = await supabaseDebug
+                .from('libros')
+                .select('codigo_barras, fecha_compra')
+                .eq('signatura', signatura)
+                .maybeSingle();
+            
+            if (libroExistente) {
+                const anioExistente = libroExistente.fecha_compra ? libroExistente.fecha_compra.slice(0,4) : 'año desconocido';
+                const confirmar = confirm(`⚠️ ADVERTENCIA\n\nLa signatura "${signatura}" ya existe para un libro registrado en el año ${anioExistente}.\n\n¿Deseas continuar y guardar este libro igualmente?`);
+                
+                if (!confirmar) return;
+            }
+            
+            // Si no existe o el usuario confirma, guardar
             const { error } = await supabaseDebug.from('libros').insert(libroData);
             
             if (error) {
