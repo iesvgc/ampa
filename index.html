@@ -1690,8 +1690,10 @@
         }
         
         // Obtener datos del historial para saber si el lote está entregado
-        const { data: historial } = alumnoId ? await supabase.from('historial_alumnos').select('lote_entregado').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle() : { data: null };
+        const { data: historial } = alumnoId ? await supabase.from('historial_alumnos').select('lote_entregado, donante, donacion_observaciones').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle() : { data: null };
         const loteEntregado = historial?.lote_entregado || false;
+        const esDonante = historial?.donante || false;
+        const donacionObs = historial?.donacion_observaciones || '';
         
         // Obtener préstamos (libres, no entregados aún)
         const { data: prestamos } = alumnoId ? await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false) : { data: [] };
@@ -1759,11 +1761,22 @@
                 <div><label><input type="checkbox" id="editBilingue" ${historialActual?.bilingue ? 'checked' : ''}> Bilingüe</label></div>
                 <div><label><input type="checkbox" id="editBeca" ${historialActual?.beca ? 'checked' : ''}> Beca</label></div>
                 <div><label>Socio AMPA</label><input type="text" id="editSocioDisplay" value="${historialActual?.socio_ampa ? 'Sí' : 'No'}" disabled style="background:#f0f0f0;"></div>
-                <div><label>Donante</label><input type="text" id="editDonanteDisplay" value="${historialActual?.donante ? 'Sí' : 'No'}" disabled style="background:#f0f0f0;"></div>
-                <div><label>Observaciones</label><textarea id="editObservaciones">${historialActual?.observaciones || ''}</textarea></div>
+                <div><label>Donante</label>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="editDonanteDisplay" value="${esDonante ? 'Sí' : 'No'}" readonly style="background:#f0f0f0; flex:1; min-width:80px; cursor:pointer;">
+                        <button id="btnMarcarDonante" class="success" style="padding:4px 12px; font-size:0.8rem;">⭐ Marcar donante</button>
+                        <button id="btnQuitarDonante" class="danger" style="padding:4px 12px; font-size:0.8rem;">❌ Quitar donante</button>
+                    </div>
+                </div>
+                <div id="donacionObservacionesDiv" style="${esDonante ? '' : 'display:none;'} grid-column: 1 / -1;">
+                    <label>Observaciones de donación</label>
+                    <textarea id="editDonacionObservaciones" rows="2" placeholder="Ej: Donó Matemáticas, Lengua e Inglés" style="width:100%;">${donacionObs || ''}</textarea>
+                    <small style="color:#64748b;">📌 Describe qué materiales o asignaturas donó el alumno</small>
+                </div>
+                <div style="grid-column: 1 / -1;"><label>Observaciones generales</label><textarea id="editObservaciones">${historialActual?.observaciones || ''}</textarea></div>
             </div>
             <div style="background:#fef3c7; padding:12px; border-radius:12px; margin:12px 0;">
-                <small>📌 Nota: Socio AMPA y Donante se editan desde las secciones "SOCIOS AMPA" y "BIBLIOTECA" respectivamente.</small>
+                <small>📌 Nota: Socio AMPA se edita desde la sección "SOCIOS AMPA".</small>
             </div>
             <div id="librosSeccion"></div>
             ${donacionesHtml}
@@ -1862,6 +1875,7 @@
                     socio_ampa: false,
                     diversificacion: document.getElementById('editDiversificacion').checked,
                     donante: false,
+                    donacion_observaciones: null,
                     observaciones: document.getElementById('editObservaciones').value || '',
                     activo: true
                 };
@@ -1887,6 +1901,7 @@
                 socio_ampa: historialActual?.socio_ampa || false,
                 diversificacion: document.getElementById('editDiversificacion').checked,
                 donante: historialActual?.donante || false,
+                donacion_observaciones: document.getElementById('editDonacionObservaciones').value || null,
                 observaciones: document.getElementById('editObservaciones').value,
                 activo: true
             };
@@ -1903,6 +1918,63 @@
             alert('Alumno guardado');
             cargarAlumnos();
         };
+        
+        // ========== MARCAR DONANTE ==========
+        const btnMarcarDonante = document.getElementById('btnMarcarDonante');
+        if (btnMarcarDonante) {
+            btnMarcarDonante.onclick = async () => {
+                if (!alumnoId) {
+                    alert("Primero guarda el alumno");
+                    return;
+                }
+                const confirmar = confirm(`¿Marcar a ${alumno?.nombre} como donante?`);
+                if (!confirmar) return;
+                
+                const { error } = await supabase
+                    .from('historial_alumnos')
+                    .update({ donante: true })
+                    .eq('alumno_id', alumnoId)
+                    .eq('ano_academico_id', currentAnoId);
+                
+                if (error) {
+                    alert('Error: ' + error.message);
+                } else {
+                    alert('✅ Alumno marcado como donante');
+                    document.getElementById('editDonanteDisplay').value = 'Sí';
+                    document.getElementById('donacionObservacionesDiv').style.display = 'block';
+                    historialActual.donante = true;
+                }
+            };
+        }
+    
+        // ========== QUITAR DONANTE ==========
+        const btnQuitarDonante = document.getElementById('btnQuitarDonante');
+        if (btnQuitarDonante) {
+            btnQuitarDonante.onclick = async () => {
+                if (!alumnoId) {
+                    alert("Primero guarda el alumno");
+                    return;
+                }
+                const confirmar = confirm(`¿Quitar la condición de donante a ${alumno?.nombre}?`);
+                if (!confirmar) return;
+                
+                const { error } = await supabase
+                    .from('historial_alumnos')
+                    .update({ donante: false, donacion_observaciones: null })
+                    .eq('alumno_id', alumnoId)
+                    .eq('ano_academico_id', currentAnoId);
+                
+                if (error) {
+                    alert('Error: ' + error.message);
+                } else {
+                    alert('✅ Donante quitado');
+                    document.getElementById('editDonanteDisplay').value = 'No';
+                    document.getElementById('donacionObservacionesDiv').style.display = 'none';
+                    document.getElementById('editDonacionObservaciones').value = '';
+                    historialActual.donante = false;
+                }
+            };
+        }
         
         // ========== IMPRIMIR FICHA ==========
         if(document.getElementById('imprimirAlumnoBtn')) {
@@ -1962,6 +2034,7 @@
                             <div class="dato"><strong>Beca:</strong> ${historialActual?.beca ? 'Sí' : 'No'}</div>
                             <div class="dato"><strong>Socio AMPA:</strong> ${historialActual?.socio_ampa ? 'Sí' : 'No'}</div>
                             <div class="dato"><strong>Donante:</strong> ${historialActual?.donante ? 'Sí' : 'No'}</div>
+                            ${historialActual?.donacion_observaciones ? `<div class="dato" style="grid-column: 1 / -1;"><strong>Observaciones donación:</strong> ${historialActual.donacion_observaciones}</div>` : ''}
                         </div>
                         <h3>📚 LIBROS PRESTADOS (${prestamosActivos?.length || 0})</h3>
                         <table>
@@ -2016,10 +2089,9 @@
         }
         
         // ========== DAR DE BAJA ALUMNO ==========
-        // ========== DAR DE BAJA ALUMNO ==========
         if(document.getElementById('bajaAlumnoBtn')) {
-            const alumnoIdLocal = alumnoId;  // Capturar el valor actual
-            const anoIdLocal = currentAnoId;  // Capturar el valor actual
+            const alumnoIdLocal = alumnoId;
+            const anoIdLocal = currentAnoId;
             
             document.getElementById('bajaAlumnoBtn').onclick = async () => {
                 if(confirm('¿Dar de baja a este alumno? Se conservará el historial.')) {
@@ -2052,7 +2124,7 @@
                             }
                             
                             alert('Alumno dado de baja');
-                            cargarTab('alumnos');  // Volver a la lista de alumnos
+                            cargarTab('alumnos');
                             
                         } catch(error) {
                             console.error("Error general:", error);
