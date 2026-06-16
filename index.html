@@ -2973,7 +2973,7 @@
                 query = query.in('codigo_barras', ['ninguno']);
             }
         }
-
+    
         
         const verSoloBaja = document.getElementById('verLibrosInactivos')?.checked;
         
@@ -3004,30 +3004,44 @@
             return;
         }
         
+        // ========== CONSULTAS MASIVAS (1 sola vez) ==========
+        // Obtener TODOS los préstamos activos de una vez
+        const { data: todosPrestamos } = await supabase
+            .from('prestamos')
+            .select('libro_codigo, alumnos(nombre)')
+            .eq('entregado', false);
+    
+        // Crear un mapa para acceso rápido: libro_codigo -> nombre del alumno
+        const prestamoMap = {};
+        for (const p of todosPrestamos || []) {
+            prestamoMap[p.libro_codigo] = p.alumnos?.nombre || 'Alumno';
+        }
+    
+        // Obtener TODAS las bajas de libros de una vez
+        const { data: todasBajas } = await supabase
+            .from('bajas_libros')
+            .select('libro_codigo, motivo, fecha_baja');
+    
+        // Crear un mapa para acceso rápido
+        const bajaMap = {};
+        for (const b of todasBajas || []) {
+            bajaMap[b.libro_codigo] = b;
+        }
+        // ========== FIN CONSULTAS MASIVAS ==========
+        
         let html = `<h3>Resultados (${libros.length})</h3>`;
         
         for (const libro of libros) {
             console.log("Libro:", libro);
             
-            // Verificar si está prestado
-            const { data: prestamo } = await supabase
-                .from('prestamos')
-                .select('*, alumnos(*)')
-                .eq('libro_codigo', libro.codigo_barras)
-                .eq('entregado', false)
-                .maybeSingle();
+            // Verificar si está prestado (usando el mapa)
+            const prestamo = prestamoMap[libro.codigo_barras];
+            const estadoPrestamo = prestamo ? `🔴 Prestado a: ${prestamo}` : '🟢 Disponible';
             
-            const estadoPrestamo = prestamo ? `🔴 Prestado a: ${prestamo.alumnos?.nombre}` : '🟢 Disponible';
-            
-            // Obtener datos de baja si el libro está inactivo
+            // Obtener datos de baja (usando el mapa)
             let infoBaja = '';
             if (libro.activo === false) {
-                const { data: baja } = await supabase
-                    .from('bajas_libros')
-                    .select('motivo, fecha_baja')
-                    .eq('libro_codigo', libro.codigo_barras)
-                    .maybeSingle();
-                
+                const baja = bajaMap[libro.codigo_barras];
                 if (baja) {
                     infoBaja = `<br>📅 Baja: ${baja.fecha_baja || '-'} | Motivo: ${baja.motivo || '-'}`;
                 }
