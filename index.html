@@ -2989,7 +2989,7 @@
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
         // ========== CONSTRUIR QUERY BASE ==========
-        let query = supabase.from('libros').select('*', { count: 'exact' });
+        let query = supabase.from('libros').select('*');
         
         // Aplicar filtros
         const estadoPrestamoFiltro = document.getElementById('filtroEstadoPrestamo').value;
@@ -3065,15 +3065,15 @@
         let desde = 0;
         const limite = 1000;
         let hayMas = true;
-        let errorFinal = null;
+        let errorGlobal = null;
         
         while (hayMas) {
-            const { data: librosPagina, error, count } = await query
+            const { data: librosPagina, error } = await query
                 .order('created_at', { ascending: false })
                 .range(desde, desde + limite - 1);
             
             if (error) {
-                errorFinal = error;
+                errorGlobal = error;
                 break;
             }
             
@@ -3086,8 +3086,8 @@
             }
         }
         
-        if (errorFinal) {
-            resultadosDiv.innerHTML = `<p>Error: ${errorFinal.message}</p>`;
+        if (errorGlobal) {
+            resultadosDiv.innerHTML = `<p>Error: ${errorGlobal.message}</p>`;
             return;
         }
         
@@ -3124,11 +3124,25 @@
             .select('*', { count: 'exact', head: true })
             .eq('activo', !verSoloBaja);
         
-        let html = `<h3>Resultados: ${libros.length} libros mostrados de ${totalReal || '?'} totales</h3>`;
+        let html = `<h3>Resultados: ${libros.length} libros mostrados de ${totalReal || '?'} totales</h3>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
+                    <thead><tr style="background:#2563eb; color:white;">
+                        <th style="padding:6px;">Título</th>
+                        <th style="padding:6px;">Signatura</th>
+                        <th style="padding:6px;">Materia</th>
+                        <th style="padding:6px;">Curso</th>
+                        <th style="padding:6px;">Editorial</th>
+                        <th style="padding:6px;">Estado</th>
+                        <th style="padding:6px;">Origen</th>
+                        <th style="padding:6px;">Préstamo</th>
+                        <th style="padding:6px;">Acciones</th>
+                    </tr></thead>
+                    <tbody>`;
         
         for (const libro of libros) {
             const prestamo = prestamoMap[libro.codigo_barras];
-            const estadoPrestamo = prestamo ? `🔴 Prestado a: ${prestamo}` : '🟢 Disponible';
+            const estadoPrestamo = prestamo ? `🔴 ${prestamo}` : '🟢 Disponible';
             
             let infoBaja = '';
             if (libro.activo === false) {
@@ -3139,24 +3153,37 @@
             }
             
             html += `
-                <div class="alumno-row">
-                    <div class="alumno-info">
-                        <strong>${libro.titulo}</strong> ${libro.activo === false ? '<span style="color:red;"> 🗑️ DADO DE BAJA</span>' : ''}<br>
-                        📖 Signatura: ${libro.signatura || 'Sin asignar'} | Código: ${libro.codigo_barras}<br>
-                        📚 Materia: ${libro.materia || '-'} | Curso: ${libro.curso_para || '-'}<br>
-                        🏢 Editorial: ${libro.editorial || '-'} | Estado: ${libro.estado || 'nuevo'}<br>
-                        🏷️ Origen: ${libro.origen || 'IES'} | ${estadoPrestamo}
+                <tr style="border-bottom:1px solid #ddd;">
+                    <td style="padding:6px;">
+                        <strong>${libro.titulo}</strong>
+                        ${libro.activo === false ? '<br><span style="color:red;">🗑️ DADO DE BAJA</span>' : ''}
                         ${infoBaja}
-                        ${libro.incidencia ? `<br>⚠️ <strong style="color:#dc2626;">Incidencia:</strong> ${libro.incidencia}` : ''}                        
-                    </div>
-                    <div class="alumno-actions">
-                        ${libro.activo === true ? `<button onclick="window.editarLibro('${libro.codigo_barras}')">✏️ Editar</button>` : ''}
-                        ${libro.activo === true ? `<button class="danger" onclick="window.darBajaLibro('${libro.codigo_barras}')">🗑️ Dar baja</button>` : ''}
-                        ${prestamo ? `<button class="secondary" onclick="window.verPrestamoLibro('${libro.codigo_barras}')">👤 Ver quién lo tiene</button>` : ''}
-                    </div>
-                </div>
+                        ${libro.incidencia ? `<br>⚠️ <span style="color:#dc2626;">${libro.incidencia}</span>` : ''}
+                    </td>
+                    <td style="padding:6px;">${libro.signatura || '-'}</td>
+                    <td style="padding:6px;">${libro.materia || '-'}</td>
+                    <td style="padding:6px;">${libro.curso_para || '-'}</td>
+                    <td style="padding:6px;">${libro.editorial || '-'}</td>
+                    <td style="padding:6px;">${libro.estado || 'nuevo'}</td>
+                    <td style="padding:6px;">${libro.origen || 'IES'}</td>
+                    <td style="padding:6px; font-weight:bold; ${prestamo ? 'color:#dc2626;' : 'color:#10b981;'}">${estadoPrestamo}</td>
+                    <td style="padding:6px; white-space:nowrap;">
+                        ${libro.activo === true ? `<button onclick="window.editarLibro('${libro.codigo_barras}')" style="padding:2px 6px; font-size:0.7rem;">✏️</button>` : ''}
+                        ${libro.activo === true ? `<button class="danger" onclick="window.darBajaLibro('${libro.codigo_barras}')" style="padding:2px 6px; font-size:0.7rem;">🗑️</button>` : ''}
+                        ${prestamo ? `<button class="secondary" onclick="window.verPrestamoLibro('${libro.codigo_barras}')" style="padding:2px 6px; font-size:0.7rem;">👤</button>` : ''}
+                    </td>
+                </tr>
             `;
         }
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top:10px; text-align:center; font-size:0.8rem; color:#64748b;">
+                Mostrando ${libros.length} de ${totalReal || '?'} libros
+            </div>
+        `;
         resultadosDiv.innerHTML = html;
     }
     window.darBajaLibro = async (codigoBarras) => {
