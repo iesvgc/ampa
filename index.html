@@ -2487,6 +2487,19 @@
     
     // ==================== BIBLIOTECA ====================
     async function cargarBiblioteca() {
+        // ========== CONTADOR DE LIBROS TOTALES ==========
+        const { count: totalActivos } = await supabase
+            .from('libros')
+            .select('*', { count: 'exact', head: true })
+            .eq('activo', true);
+    
+        const { count: totalInactivos } = await supabase
+            .from('libros')
+            .select('*', { count: 'exact', head: true })
+            .eq('activo', false);
+    
+        const totalLibros = (totalActivos || 0) + (totalInactivos || 0);
+        
         // Obtener listas de materias y editoriales existentes
         const { data: materiasBD } = await supabase.from('libros').select('materia').not('materia', 'is', null);
         const { data: editorialesBD } = await supabase.from('libros').select('editorial').not('editorial', 'is', null);
@@ -2495,9 +2508,20 @@
     
         let html = `
             <div class="card">
-                <div class="flex"><h2>📖 Biblioteca</h2>
-                    <button id="btnNuevoLibro" class="success">➕ Añadir Libro (escanear)</button>
-                    <button id="btnEscanearInfo" class="secondary">📷 Escanear para ver información</button>
+                <div class="flex">
+                    <div>
+                        <h2>📖 Biblioteca</h2>
+                        <!-- CONTADOR DE LIBROS - APARECE SIEMPRE -->
+                        <div style="display:flex; gap:20px; margin:10px 0 15px 0; flex-wrap:wrap; background:#f8fafc; padding:10px 16px; border-radius:12px;">
+                            <span style="font-size:0.9rem;">📚 <strong>Total:</strong> ${totalLibros} libros</span>
+                            <span style="font-size:0.9rem; color:#10b981;">🟢 <strong>Activos:</strong> ${totalActivos || 0}</span>
+                            <span style="font-size:0.9rem; color:#dc2626;">🔴 <strong>Inactivos:</strong> ${totalInactivos || 0}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button id="btnNuevoLibro" class="success">➕ Añadir Libro (escanear)</button>
+                        <button id="btnEscanearInfo" class="secondary">📷 Escanear para ver información</button>
+                    </div>
                 </div>
                 <div class="search-filters">
                     <div class="form-grid">
