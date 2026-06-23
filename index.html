@@ -6800,7 +6800,12 @@
     if (loginUser) {
         loginUser.onkeypress = (e) => { if (e.key === 'Enter') hacerLogin(); };
     }
-    
+    window.cargarBiblioteca = cargarBiblioteca;
+    window.buscarLibros = buscarLibros;
+    window.cargarAlumnos = cargarAlumnos;
+    window.cargarSocios = cargarSocios;
+    window.cargarBusquedaRapida = cargarBusquedaRapida;
+    window.cargarPrestamosRapido = cargarPrestamosRapido;    
     // Iniciar verificación de login (SOLO UNA VEZ)
     verificarLogin();
     
