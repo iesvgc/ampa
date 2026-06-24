@@ -3307,10 +3307,20 @@
         }
         const nuevoNumero = ultimoNumero + 1;
         
+        // Generar opciones de materias desde materiasPredefinidas
+        const opcionesMaterias = materiasPredefinidas.map(m => 
+            `<option value="${m.nombre}" data-codigo="${m.codigo}">${m.nombre}</option>`
+        ).join('');
+        
         let html = `<div class="card"><h2>📖 Nuevo Libro</h2>
             <div class="form-grid">
                 <div><label>Título *</label><input id="nuevoTitulo"></div>
-                <div><label>Materia *</label><input id="nuevaMateria" placeholder="Ej: Matemáticas"></div>
+                <div><label>Materia *</label>
+                    <select id="nuevaMateria">
+                        <option value="">Selecciona materia</option>
+                        ${opcionesMaterias}
+                    </select>
+                </div>
                 <div><label>Curso *</label><select id="nuevoCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
                 <div><label>Editorial</label><input id="nuevaEditorial"></div>
                 <div><label>Estado</label><select id="nuevoEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
@@ -3322,8 +3332,6 @@
         </div>`;
         document.getElementById('mainPanel').innerHTML = html;
         
-
-        
         document.getElementById('crearLibroBtn').onclick = async () => {
             const titulo = document.getElementById('nuevoTitulo').value.trim();
             const materia = document.getElementById('nuevaMateria').value.trim();
@@ -3333,7 +3341,6 @@
             }
             
             const curso = document.getElementById('nuevoCurso').value;
-
             
             const { error } = await supabase.from('libros').insert({
                 codigo_barras: Date.now().toString(),
