@@ -2488,25 +2488,43 @@
     
     // ==================== BIBLIOTECA ====================
     async function cargarBiblioteca() {
-
         // ========== CONTADOR DE LIBROS TOTALES ==========
         const { count: totalLibros } = await supabase
             .from('libros')
             .select('*', { count: 'exact', head: true });
         
-        // Obtener listas de materias y editoriales existentes
-        const { data: materiasBD } = await supabase.from('libros').select('materia').not('materia', 'is', null);
-        const { data: editorialesBD } = await supabase.from('libros').select('editorial').not('editorial', 'is', null);
-        const materias = [...new Set(materiasBD.map(m => m.materia))];
-        const editoriales = [...new Set(editorialesBD.map(e => e.editorial))];
-    
+        // Obtener editoriales existentes (con paginación por si hay muchas)
+        let todasEditoriales = [];
+        let desde = 0;
+        const limite = 1000;
+        let hayMas = true;
+        
+        while (hayMas) {
+            const { data: editorialesPagina, error } = await supabase
+                .from('libros')
+                .select('editorial')
+                .not('editorial', 'is', null)
+                .range(desde, desde + limite - 1);
+            
+            if (error || !editorialesPagina || editorialesPagina.length === 0) {
+                hayMas = false;
+            } else {
+                todasEditoriales = todasEditoriales.concat(editorialesPagina);
+                desde += limite;
+                if (editorialesPagina.length < limite) hayMas = false;
+            }
+        }
+        
+        const editoriales = [...new Set(todasEditoriales.map(e => e.editorial))];
+        
+        // ========== USAR MATERIAS PREDEFINIDAS (NO CONSULTAR BD) ==========
+        const materias = materiasPredefinidas.map(m => m.nombre);
+        
         let html = `
             <div class="card">
                 <div class="flex">
                     <div>
                         <h2>📖 Biblioteca</h2>
-
-                        <!-- CONTADOR DE LIBROS - APARECE SIEMPRE -->
                         <div style="display:flex; gap:20px; margin:10px 0 15px 0; flex-wrap:wrap; background:#f8fafc; padding:10px 16px; border-radius:12px;">
                             <span style="font-size:0.9rem;">📚 <strong>Total:</strong> ${totalLibros} libros</span>
                         </div>
@@ -4962,11 +4980,32 @@
     // ==================== INFORMES ====================
     // ==================== BÚSQUEDA RÁPIDA ====================
     async function cargarBusquedaRapida() {
-        // Obtener listas para filtros
-        const { data: materiasBD } = await supabase.from('libros').select('materia').not('materia', 'is', null);
-        const { data: editorialesBD } = await supabase.from('libros').select('editorial').not('editorial', 'is', null);
-        const materias = [...new Set(materiasBD.map(m => m.materia))];
-        const editoriales = [...new Set(editorialesBD.map(e => e.editorial))];
+        // Obtener editoriales existentes (con paginación)
+        let todasEditoriales = [];
+        let desde = 0;
+        const limite = 1000;
+        let hayMas = true;
+        
+        while (hayMas) {
+            const { data: editorialesPagina, error } = await supabase
+                .from('libros')
+                .select('editorial')
+                .not('editorial', 'is', null)
+                .range(desde, desde + limite - 1);
+            
+            if (error || !editorialesPagina || editorialesPagina.length === 0) {
+                hayMas = false;
+            } else {
+                todasEditoriales = todasEditoriales.concat(editorialesPagina);
+                desde += limite;
+                if (editorialesPagina.length < limite) hayMas = false;
+            }
+        }
+        
+        const editoriales = [...new Set(todasEditoriales.map(e => e.editorial))];
+        
+        // ========== USAR MATERIAS PREDEFINIDAS (NO CONSULTAR BD) ==========
+        const materias = materiasPredefinidas.map(m => m.nombre);
         
         let html = `
             <div class="card">
@@ -4974,7 +5013,6 @@
                 <div class="search-filters">
                     <div class="form-grid">
                         <div><label>Tipo de listado</label><select id="tipoListado">
-
                             <optgroup label="👨‍🎓 ALUMNOS">
                                 <option value="alumnos_pendientes">📚 Alumnos con libros pendientes de devolver</option>
                                 <option value="alumnos_lotes_preparados">📦 Alumnos con lotes preparados</option>
@@ -5017,7 +5055,6 @@
             const filtrosDiv = document.getElementById('filtrosDinamicos');
             
             if (tipo.startsWith('alumnos')) {
-
                 filtrosDiv.innerHTML = `
                     <div class="form-grid">
                         <div><label>Curso</label><select id="filtroCursoInforme">
