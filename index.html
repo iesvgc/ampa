@@ -2517,8 +2517,24 @@
         
         const editoriales = [...new Set(todasEditoriales.map(e => e.editorial))];
         
-        // ========== MATERIAS: USAR LAS PREDEFINIDAS (SIEMPRE COMPLETAS) ==========
-        const materias = materiasPredefinidas.map(m => m.nombre);
+        // ========== MATERIAS: USAR TODAS LAS PREDEFINIDAS ==========
+        // En lugar de consultar la BD (que tiene límite de 1000), usamos materiasPredefinidas
+        // pero como está dentro de la función anónima, la definimos aquí
+        const todasMaterias = [
+            "Lengua y Literatura", "Matemáticas", "Geografia e Historia", 
+            "Biología y geología", "Matemáticas Aplicadas (A)", "Matemáticas Académicas (B)",
+            "Física y química", "Asturiano", "Inglés Bilingüe", "Música", 
+            "Inglés No Bilingüe", "Francés", "Economía, Emprendimiento y Actividad Empresarial",
+            "Cultura Científica", "Cultura clásica", "Geografia e Historia Bilingüe",
+            "Ámbito Científico Matemático", "Latín", "Historia de la Filosofía", "Economía",
+            "Ámbito Científico Tecnológico", "Ámbito Lingüístico y Social",
+            "Formación y Orientación Profesional", "Educación en valores cívicos y éticos",
+            "Biología, geología y CC. AA.", "Dibujo técnico", "Historia del Mundo Contemporáneo",
+            "Matemáticas I", "Matemáticas Generales", "Filosofía", "Química", "Física",
+            "Geología y CC.AA.", "Geografia", "Dibujo técnico II",
+            "Empresa y Diseño de Modelos de Negocio", "Anatomía Aplicada"
+        ];
+        const materias = todasMaterias;
         
         let html = `
             <div class="card">
@@ -5004,8 +5020,22 @@
         
         const editoriales = [...new Set(todasEditoriales.map(e => e.editorial))];
         
-        // ========== MATERIAS: USAR LAS PREDEFINIDAS (SIEMPRE COMPLETAS) ==========
-        const materias = materiasPredefinidas.map(m => m.nombre);
+        // ========== MATERIAS: USAR TODAS LAS PREDEFINIDAS ==========
+        const todasMaterias = [
+            "Lengua y Literatura", "Matemáticas", "Geografia e Historia", 
+            "Biología y geología", "Matemáticas Aplicadas (A)", "Matemáticas Académicas (B)",
+            "Física y química", "Asturiano", "Inglés Bilingüe", "Música", 
+            "Inglés No Bilingüe", "Francés", "Economía, Emprendimiento y Actividad Empresarial",
+            "Cultura Científica", "Cultura clásica", "Geografia e Historia Bilingüe",
+            "Ámbito Científico Matemático", "Latín", "Historia de la Filosofía", "Economía",
+            "Ámbito Científico Tecnológico", "Ámbito Lingüístico y Social",
+            "Formación y Orientación Profesional", "Educación en valores cívicos y éticos",
+            "Biología, geología y CC. AA.", "Dibujo técnico", "Historia del Mundo Contemporáneo",
+            "Matemáticas I", "Matemáticas Generales", "Filosofía", "Química", "Física",
+            "Geología y CC.AA.", "Geografia", "Dibujo técnico II",
+            "Empresa y Diseño de Modelos de Negocio", "Anatomía Aplicada"
+        ];
+        const materias = todasMaterias;
         
         let html = `
             <div class="card">
