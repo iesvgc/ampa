@@ -2493,7 +2493,7 @@
             .from('libros')
             .select('*', { count: 'exact', head: true });
         
-        // Obtener editoriales existentes (con paginación por si hay muchas)
+        // ========== OBTENER EDITORIALES CON PAGINACIÓN ==========
         let todasEditoriales = [];
         let desde = 0;
         const limite = 1000;
@@ -2517,7 +2517,7 @@
         
         const editoriales = [...new Set(todasEditoriales.map(e => e.editorial))];
         
-        // ========== USAR MATERIAS PREDEFINIDAS (NO CONSULTAR BD) ==========
+        // ========== MATERIAS: USAR LAS PREDEFINIDAS (SIEMPRE COMPLETAS) ==========
         const materias = materiasPredefinidas.map(m => m.nombre);
         
         let html = `
@@ -4980,7 +4980,7 @@
     // ==================== INFORMES ====================
     // ==================== BÚSQUEDA RÁPIDA ====================
     async function cargarBusquedaRapida() {
-        // Obtener editoriales existentes (con paginación)
+        // ========== OBTENER EDITORIALES CON PAGINACIÓN ==========
         let todasEditoriales = [];
         let desde = 0;
         const limite = 1000;
@@ -5004,7 +5004,7 @@
         
         const editoriales = [...new Set(todasEditoriales.map(e => e.editorial))];
         
-        // ========== USAR MATERIAS PREDEFINIDAS (NO CONSULTAR BD) ==========
+        // ========== MATERIAS: USAR LAS PREDEFINIDAS (SIEMPRE COMPLETAS) ==========
         const materias = materiasPredefinidas.map(m => m.nombre);
         
         let html = `
