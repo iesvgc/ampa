@@ -2591,37 +2591,35 @@
             if(e.key === 'Enter') buscarLibros();
         });
     }
-
-
     async function obtenerSiguienteEjemplar(origen, curso, materia) {
-        try {
-            const { data, error } = await supabase
-                .from('libros')
-                .select('signatura')
-                .eq('origen', origen)
-                .eq('curso_para', curso || '')
-                .eq('materia', materia || '')
-                .not('signatura', 'is', null)
-                .order('signatura', { ascending: false })
-                .limit(1);
-            
-            if (error) {
-                console.error('Error al obtener siguiente ejemplar:', error);
-                return '001';
+        let prefijo = '';
+        let campo = 'signatura';
+        
+        if (origen === 'AMPA') prefijo = 'A';
+        else if (origen === 'Donado') prefijo = 'D';
+        else return null;
+        
+        const { data: libros } = await supabase
+            .from('libros')
+            .select('signatura')
+            .eq('origen', origen)
+            .eq('curso_para', curso)
+            .eq('materia', materia)
+            .not('signatura', 'is', null);
+        
+        let maxNumero = 0;
+        const regex = new RegExp(`(\\d+)${prefijo}$`);
+        
+        for (const libro of libros) {
+            const match = libro.signatura.match(regex);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > maxNumero) maxNumero = num;
             }
-            
-            if (data && data.length > 0) {
-                const match = data[0].signatura.match(/(\d+)$/);
-                if (match) {
-                    const numero = parseInt(match[1], 10) + 1;
-                    return numero.toString().padStart(3, '0');
-                }
-            }
-            return '001';
-        } catch (e) {
-            console.error('Error:', e);
-            return '001';
         }
+        
+        const siguiente = maxNumero + 1;
+        return `${String(siguiente).padStart(3, '0')}${prefijo}`;
     }
     
     async function procesarNuevoLibroConEscanner(codigo) {
@@ -2752,8 +2750,6 @@
         document.getElementById('nuevoMateria').addEventListener('change', actualizarSignatura);
         
         // Mostrar/ocultar buscador de donante según origen y sugerir número de ejemplar
-        // Mostrar/ocultar buscador de donante según origen y sugerir número de ejemplar
-
         document.getElementById('nuevoOrigen').addEventListener('change', async function() {
             const donanteDiv = document.getElementById('donanteDiv');
             const sigEjemplar = document.getElementById('sigEjemplar');
@@ -2768,14 +2764,23 @@
                 document.getElementById('resultadoDonante').innerHTML = '';
             }
             
-            // === AUTO-RELLENAR PARA TODOS LOS ORÍGENES (IES, AMPA, Donado) ===
-            const cursoActual = document.getElementById('nuevoCurso').value;
-            const materiaActual = document.getElementById('nuevoMateria').value;
-            const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
-            
-            // SIEMPRE asignar un valor, nunca vacío
-            sigEjemplar.value = sugerido || '001';
-            ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sigEjemplar.value} (puedes modificarlo)`;
+            // Sugerir número automático para AMPA o Donado
+            if (origen === 'AMPA' || origen === 'Donado') {
+                const cursoActual = document.getElementById('nuevoCurso').value;
+                const materiaActual = document.getElementById('nuevoMateria').value;
+                const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
+                if (sugerido) {
+                    sigEjemplar.value = sugerido;
+                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sugerido} (puedes modificarlo)`;
+                } else {
+                    const letra = origen === 'AMPA' ? 'A' : 'D';
+                    sigEjemplar.value = `001${letra}`;
+                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: 001${letra} (puedes modificarlo)`;
+                }
+            } else if (origen === 'IES') {
+                sigEjemplar.value = '';
+                ayudaSpan.innerHTML = `📌 Formato: Curso - Materia - Nº ejemplar (escribe el número manualmente)`;
+            }
         });
         
         // Buscar donante
