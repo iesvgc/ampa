@@ -2592,9 +2592,9 @@
         });
     }
 
+
     async function obtenerSiguienteEjemplar(origen, curso, materia) {
         try {
-            // Buscar el último número para cualquier origen (IES, AMPA, Donado)
             const { data, error } = await supabase
                 .from('libros')
                 .select('signatura')
@@ -2607,7 +2607,7 @@
             
             if (error) {
                 console.error('Error al obtener siguiente ejemplar:', error);
-                return null;
+                return '001';
             }
             
             if (data && data.length > 0) {
@@ -2617,10 +2617,10 @@
                     return numero.toString().padStart(3, '0');
                 }
             }
-            return null;
+            return '001';
         } catch (e) {
             console.error('Error:', e);
-            return null;
+            return '001';
         }
     }
     
@@ -2753,6 +2753,7 @@
         
         // Mostrar/ocultar buscador de donante según origen y sugerir número de ejemplar
         // Mostrar/ocultar buscador de donante según origen y sugerir número de ejemplar
+
         document.getElementById('nuevoOrigen').addEventListener('change', async function() {
             const donanteDiv = document.getElementById('donanteDiv');
             const sigEjemplar = document.getElementById('sigEjemplar');
@@ -2772,13 +2773,9 @@
             const materiaActual = document.getElementById('nuevoMateria').value;
             const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
             
-            if (sugerido) {
-                sigEjemplar.value = sugerido;
-                ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sugerido} (puedes modificarlo)`;
-            } else {
-                sigEjemplar.value = '001';
-                ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: 001 (puedes modificarlo)`;
-            }
+            // SIEMPRE asignar un valor, nunca vacío
+            sigEjemplar.value = sugerido || '001';
+            ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sigEjemplar.value} (puedes modificarlo)`;
         });
         
         // Buscar donante
