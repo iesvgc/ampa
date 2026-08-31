@@ -2591,35 +2591,37 @@
             if(e.key === 'Enter') buscarLibros();
         });
     }
+
     async function obtenerSiguienteEjemplar(origen, curso, materia) {
-        let prefijo = '';
-        let campo = 'signatura';
-        
-        if (origen === 'AMPA') prefijo = 'A';
-        else if (origen === 'Donado') prefijo = 'D';
-        else return null;
-        
-        const { data: libros } = await supabase
-            .from('libros')
-            .select('signatura')
-            .eq('origen', origen)
-            .eq('curso_para', curso)
-            .eq('materia', materia)
-            .not('signatura', 'is', null);
-        
-        let maxNumero = 0;
-        const regex = new RegExp(`(\\d+)${prefijo}$`);
-        
-        for (const libro of libros) {
-            const match = libro.signatura.match(regex);
-            if (match) {
-                const num = parseInt(match[1], 10);
-                if (num > maxNumero) maxNumero = num;
+        try {
+            // Buscar el último número para cualquier origen (IES, AMPA, Donado)
+            const { data, error } = await supabase
+                .from('libros')
+                .select('signatura')
+                .eq('origen', origen)
+                .eq('curso_para', curso || '')
+                .eq('materia', materia || '')
+                .not('signatura', 'is', null)
+                .order('signatura', { ascending: false })
+                .limit(1);
+            
+            if (error) {
+                console.error('Error al obtener siguiente ejemplar:', error);
+                return null;
             }
+            
+            if (data && data.length > 0) {
+                const match = data[0].signatura.match(/(\d+)$/);
+                if (match) {
+                    const numero = parseInt(match[1], 10) + 1;
+                    return numero.toString().padStart(3, '0');
+                }
+            }
+            return null;
+        } catch (e) {
+            console.error('Error:', e);
+            return null;
         }
-        
-        const siguiente = maxNumero + 1;
-        return `${String(siguiente).padStart(3, '0')}${prefijo}`;
     }
     
     async function procesarNuevoLibroConEscanner(codigo) {
