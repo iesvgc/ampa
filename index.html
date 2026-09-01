@@ -2593,11 +2593,12 @@
     }
     async function obtenerSiguienteEjemplar(origen, curso, materia) {
         let prefijo = '';
-        let campo = 'signatura';
         
         if (origen === 'AMPA') prefijo = 'A';
         else if (origen === 'Donado') prefijo = 'D';
-        else return null;
+        // Para IES, prefijo se queda vacío
+        
+        if (!origen) return null; // Si no hay origen, no hacer nada
         
         const { data: libros } = await supabase
             .from('libros')
@@ -2608,7 +2609,13 @@
             .not('signatura', 'is', null);
         
         let maxNumero = 0;
-        const regex = new RegExp(`(\\d+)${prefijo}$`);
+        // Construir regex según el origen
+        let regex;
+        if (origen === 'IES') {
+            regex = /^(\d+)$/; // Solo dígitos
+        } else {
+            regex = new RegExp(`(\\d+)${prefijo}$`); // Dígitos + letra
+        }
         
         for (const libro of libros) {
             const match = libro.signatura.match(regex);
@@ -2619,7 +2626,12 @@
         }
         
         const siguiente = maxNumero + 1;
-        return `${String(siguiente).padStart(3, '0')}${prefijo}`;
+        // Devolver el número formateado
+        if (origen === 'IES') {
+            return String(siguiente).padStart(3, '0');
+        } else {
+            return `${String(siguiente).padStart(3, '0')}${prefijo}`;
+        }
     }
     
     async function procesarNuevoLibroConEscanner(codigo) {
@@ -2683,10 +2695,14 @@
                         <option>nuevo</option><option>usado</option><option>desgastado</option>
                     </select></div>
                     
-                    <div><label>Origen</label><select id="nuevoOrigen">
-                        <option>IES</option><option>AMPA</option><option>Donado</option>
-                    </select></div>
-                    
+                    <div><label>Origen</label>
+                        <select id="nuevoOrigen">
+                            <option value="">-- Selecciona origen --</option>
+                            <option value="IES">IES</option>
+                            <option value="AMPA">AMPA</option>
+                            <option value="Donado">Donado</option>
+                        </select>
+                    </div>
                     <div id="donanteDiv" style="display:none;">
                         <label>Alumno donante</label>
                         <div style="display:flex; gap:8px;">
@@ -2756,6 +2772,7 @@
             const origen = this.value;
             const ayudaSpan = document.getElementById('sigAyuda');
             
+            // Mostrar/ocultar buscador de donante
             if (origen === 'Donado') {
                 donanteDiv.style.display = 'block';
             } else {
@@ -2764,22 +2781,40 @@
                 document.getElementById('resultadoDonante').innerHTML = '';
             }
             
-            // Sugerir número automático para AMPA o Donado
-            if (origen === 'AMPA' || origen === 'Donado') {
-                const cursoActual = document.getElementById('nuevoCurso').value;
-                const materiaActual = document.getElementById('nuevoMateria').value;
+            // Si no hay origen seleccionado, limpiar
+            if (!origen) {
+                sigEjemplar.value = '';
+                ayudaSpan.innerHTML = '📌 Selecciona un origen para generar la signatura automáticamente';
+                return;
+            }
+            
+            // Obtener curso y materia actuales
+            const cursoActual = document.getElementById('nuevoCurso').value;
+            const materiaActual = document.getElementById('nuevoMateria').value;
+            
+            if (cursoActual && materiaActual) {
                 const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
                 if (sugerido) {
                     sigEjemplar.value = sugerido;
-                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sugerido} (puedes modificarlo)`;
+                    const nombreOrigen = origen === 'IES' ? 'IES' : (origen === 'AMPA' ? 'AMPA' : 'Donado');
+                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${nombreOrigen}: ${sugerido} (puedes modificarlo)`;
                 } else {
-                    const letra = origen === 'AMPA' ? 'A' : 'D';
-                    sigEjemplar.value = `001${letra}`;
-                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: 001${letra} (puedes modificarlo)`;
+                    // Si no hay libros previos, empezar desde 001
+                    if (origen === 'IES') {
+                        sigEjemplar.value = '001';
+                        ayudaSpan.innerHTML = `📌 Primer ejemplar para IES: 001 (puedes modificarlo)`;
+                    } else if (origen === 'AMPA') {
+                        sigEjemplar.value = '001A';
+                        ayudaSpan.innerHTML = `📌 Primer ejemplar para AMPA: 001A (puedes modificarlo)`;
+                    } else if (origen === 'Donado') {
+                        sigEjemplar.value = '001D';
+                        ayudaSpan.innerHTML = `📌 Primer ejemplar para Donado: 001D (puedes modificarlo)`;
+                    }
                 }
-            } else if (origen === 'IES') {
+            } else {
+                // Si no hay curso o materia, mostrar mensaje
                 sigEjemplar.value = '';
-                ayudaSpan.innerHTML = `📌 Formato: Curso - Materia - Nº ejemplar (escribe el número manualmente)`;
+                ayudaSpan.innerHTML = `📌 Primero selecciona curso y materia para obtener sugerencia automática`;
             }
         });
         
