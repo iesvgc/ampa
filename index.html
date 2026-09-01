@@ -4634,10 +4634,13 @@
         const encontrado = librosRecogerActual.find(l => l.codigo === codigo);
         
         if (encontrado && !encontrado.devuelto) {
-            await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', encontrado.id);
+            await supabase.from('prestamos').update({ 
+                entregado: true, 
+                fecha_devolucion: new Date().toISOString().slice(0,10) 
+            }).eq('id', encontrado.id);
+            
             encontrado.devuelto = true;
             
-            // Actualizar visualmente la fila
             const tdEstado = document.getElementById(`td-estado-${encontrado.id}`);
             if (tdEstado) {
                 tdEstado.innerHTML = '✅ DEVUELTO';
@@ -4652,11 +4655,19 @@
             
             alert(`✅ Devuelto: ${encontrado.titulo}`);
             
-            // Verificar si todos están devueltos
             const todosDevueltos = librosRecogerActual.every(l => l.devuelto);
             if (todosDevueltos) {
+                // ✅ NUEVO: Resetear el estado del alumno
+                await supabase
+                    .from('historial_alumnos')
+                    .update({ 
+                        lote_entregado: false, 
+                        fecha_entrega: null 
+                    })
+                    .eq('alumno_id', alumnoRecogerActual)
+                    .eq('ano_academico_id', currentAnoId);
+                
                 alert(`🎉 ¡Todos los libros de este alumno han sido devueltos!`);
-                // Refrescar el panel
                 window.seleccionarAlumnoRecogerDetalle(alumnoRecogerActual);
             }
         } else if (encontrado && encontrado.devuelto) {
@@ -4781,9 +4792,30 @@
         const encontrado = devolucionLibros.find(l => l.codigo === codigo);
         
         if (encontrado && !encontrado.devuelto) {
-            await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', encontrado.id);
+            await supabase.from('prestamos').update({ 
+                entregado: true, 
+                fecha_devolucion: new Date().toISOString().slice(0,10) 
+            }).eq('id', encontrado.id);
+            
             encontrado.devuelto = true;
             alert(`✅ Devuelto: ${encontrado.titulo}`);
+            
+            // ✅ NUEVO: Verificar si todos están devueltos
+            const todosDevueltos = devolucionLibros.every(l => l.devuelto);
+            if (todosDevueltos) {
+                // ✅ NUEVO: Resetear el estado del alumno
+                await supabase
+                    .from('historial_alumnos')
+                    .update({ 
+                        lote_entregado: false, 
+                        fecha_entrega: null 
+                    })
+                    .eq('alumno_id', alumnoSeleccionadoRecoger)
+                    .eq('ano_academico_id', currentAnoId);
+                
+                alert(`🎉 ¡Todos los libros han sido devueltos! El alumno puede recibir un nuevo lote.`);
+            }
+            
             mostrarListaDevolucionRecoger();
         } else if (encontrado && encontrado.devuelto) {
             alert(`⚠️ "${encontrado.titulo}" ya fue devuelto`);
