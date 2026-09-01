@@ -2596,25 +2596,28 @@
         
         if (origen === 'AMPA') prefijo = 'A';
         else if (origen === 'Donado') prefijo = 'D';
-        // Para IES, prefijo se queda vacío
+        // Para IES, prefijo se queda vacío (NO devolvemos null)
         
-        if (!origen) return null; // Si no hay origen, no hacer nada
+        if (!origen) return null;
         
+        // 🔥 CONSULTA PARA TODOS LOS ORÍGENES
         const { data: libros } = await supabase
             .from('libros')
             .select('signatura')
-            .eq('origen', origen)
+            .eq('origen', origen)   // ✅ AHORA TAMBIÉN FILTRA PARA IES
             .eq('curso_para', curso)
             .eq('materia', materia)
             .not('signatura', 'is', null);
         
         let maxNumero = 0;
-        // Construir regex según el origen
         let regex;
+        
         if (origen === 'IES') {
-            regex = /^(\d+)$/; // Solo dígitos
-        } else {
-            regex = new RegExp(`(\\d+)${prefijo}$`); // Dígitos + letra
+            regex = /^(\d+)$/;  // Solo números, ej: 001, 002, 003
+        } else if (origen === 'AMPA') {
+            regex = new RegExp(`(\\d+)A$`);  // Números + A, ej: 001A
+        } else if (origen === 'Donado') {
+            regex = new RegExp(`(\\d+)D$`);  // Números + D, ej: 001D
         }
         
         for (const libro of libros) {
@@ -2626,12 +2629,16 @@
         }
         
         const siguiente = maxNumero + 1;
-        // Devolver el número formateado
+        
         if (origen === 'IES') {
-            return String(siguiente).padStart(3, '0');
-        } else {
-            return `${String(siguiente).padStart(3, '0')}${prefijo}`;
+            return String(siguiente).padStart(3, '0');  // 001, 002, 003...
+        } else if (origen === 'AMPA') {
+            return `${String(siguiente).padStart(3, '0')}A`;  // 001A, 002A...
+        } else if (origen === 'Donado') {
+            return `${String(siguiente).padStart(3, '0')}D`;  // 001D, 002D...
         }
+        
+        return null;
     }
     
     async function procesarNuevoLibroConEscanner(codigo) {
