@@ -2592,50 +2592,83 @@
         });
     }
     async function obtenerSiguienteEjemplar(origen, curso, materia) {
-        let prefijo = '';
+        if (!origen || !curso || !materia) return null;
         
+        // Determinar prefijo según origen
+        let prefijo = '';
         if (origen === 'AMPA') prefijo = 'A';
         else if (origen === 'Donado') prefijo = 'D';
-        // Para IES, prefijo se queda vacío (NO devolvemos null)
         
-        if (!origen) return null;
-        
-        // 🔥 CONSULTA PARA TODOS LOS ORÍGENES
+        // Consultar libros existentes
         const { data: libros } = await supabase
             .from('libros')
             .select('signatura')
-            .eq('origen', origen)   // ✅ AHORA TAMBIÉN FILTRA PARA IES
+            .eq('origen', origen)
             .eq('curso_para', curso)
             .eq('materia', materia)
             .not('signatura', 'is', null);
         
+        console.log(`🔍 Buscando siguiente para ${origen} - ${curso} - ${materia}`);
+        console.log(`📚 Libros encontrados: ${libros?.length || 0}`);
+        
         let maxNumero = 0;
-        let regex;
         
-        if (origen === 'IES') {
-            regex = /^(\d+)$/;  // Solo números, ej: 001, 002, 003
-        } else if (origen === 'AMPA') {
-            regex = new RegExp(`(\\d+)A$`);  // Números + A, ej: 001A
-        } else if (origen === 'Donado') {
-            regex = new RegExp(`(\\d+)D$`);  // Números + D, ej: 001D
-        }
-        
-        for (const libro of libros) {
-            const match = libro.signatura.match(regex);
-            if (match) {
-                const num = parseInt(match[1], 10);
-                if (num > maxNumero) maxNumero = num;
+        for (const libro of libros || []) {
+            const signatura = libro.signatura || '';
+            let numeroEncontrado = null;
+            
+            // 🔥 IMPORTANTE: Buscar el número DESPUÉS del último guión
+            if (origen === 'IES') {
+                // Busca: cualquier texto - cualquier texto - NÚMERO (3 dígitos)
+                // Ej: "01-02-005" → captura "005"
+                const match = signatura.match(/-(\d{3})$/);
+                if (match) {
+                    numeroEncontrado = parseInt(match[1], 10);
+                    console.log(`   IES: ${signatura} → ${numeroEncontrado}`);
+                }
+            } else if (origen === 'AMPA') {
+                // Busca: cualquier texto - cualquier texto - NÚMERO + A
+                // Ej: "01-02-005A" → captura "005"
+                const match = signatura.match(/-(\d{3})A$/);
+                if (match) {
+                    numeroEncontrado = parseInt(match[1], 10);
+                    console.log(`   AMPA: ${signatura} → ${numeroEncontrado}`);
+                }
+            } else if (origen === 'Donado') {
+                // Busca: cualquier texto - cualquier texto - NÚMERO + D
+                // Ej: "01-02-005D" → captura "005"
+                const match = signatura.match(/-(\d{3})D$/);
+                if (match) {
+                    numeroEncontrado = parseInt(match[1], 10);
+                    console.log(`   Donado: ${signatura} → ${numeroEncontrado}`);
+                }
+            }
+            
+            if (numeroEncontrado !== null && numeroEncontrado > maxNumero) {
+                maxNumero = numeroEncontrado;
             }
         }
         
         const siguiente = maxNumero + 1;
+        console.log(`✅ Siguiente número: ${siguiente}`);
+        
+        // Construir la signatura completa con el formato CURSO-MATERIA-NÚMERO
+        // Obtener los códigos de curso y materia
+        const codigoCurso = codigosCurso[curso] || '';
+        let codigoMateria = '';
+        const materiaEncontrada = materiasPredefinidas.find(m => m.nombre === materia);
+        if (materiaEncontrada) {
+            codigoMateria = materiaEncontrada.codigo;
+        }
+        
+        const numeroFormateado = String(siguiente).padStart(3, '0');
         
         if (origen === 'IES') {
-            return String(siguiente).padStart(3, '0');  // 001, 002, 003...
+            return `${codigoCurso}-${codigoMateria}-${numeroFormateado}`;
         } else if (origen === 'AMPA') {
-            return `${String(siguiente).padStart(3, '0')}A`;  // 001A, 002A...
+            return `${codigoCurso}-${codigoMateria}-${numeroFormateado}A`;
         } else if (origen === 'Donado') {
-            return `${String(siguiente).padStart(3, '0')}D`;  // 001D, 002D...
+            return `${codigoCurso}-${codigoMateria}-${numeroFormateado}D`;
         }
         
         return null;
@@ -2775,11 +2808,10 @@
         // Mostrar/ocultar buscador de donante según origen y sugerir número de ejemplar
         document.getElementById('nuevoOrigen').addEventListener('change', async function() {
             const donanteDiv = document.getElementById('donanteDiv');
-            const sigEjemplar = document.getElementById('sigEjemplar');
+            const sigEjemplar = document.getElementById('sigEjemplar'); // Este campo SOLO debe tener el número
             const origen = this.value;
             const ayudaSpan = document.getElementById('sigAyuda');
             
-            // Mostrar/ocultar buscador de donante
             if (origen === 'Donado') {
                 donanteDiv.style.display = 'block';
             } else {
@@ -2788,23 +2820,36 @@
                 document.getElementById('resultadoDonante').innerHTML = '';
             }
             
-            // Si no hay origen seleccionado, limpiar
             if (!origen) {
                 sigEjemplar.value = '';
                 ayudaSpan.innerHTML = '📌 Selecciona un origen para generar la signatura automáticamente';
                 return;
             }
             
-            // Obtener curso y materia actuales
             const cursoActual = document.getElementById('nuevoCurso').value;
             const materiaActual = document.getElementById('nuevoMateria').value;
             
             if (cursoActual && materiaActual) {
-                const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
-                if (sugerido) {
-                    sigEjemplar.value = sugerido;
-                    const nombreOrigen = origen === 'IES' ? 'IES' : (origen === 'AMPA' ? 'AMPA' : 'Donado');
-                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${nombreOrigen}: ${sugerido} (puedes modificarlo)`;
+                const sugeridoCompleto = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
+                if (sugeridoCompleto) {
+                    // Extraer SOLO el número (y la letra si la tiene)
+                    let numeroSugerido = '';
+                    if (origen === 'IES') {
+                        const match = sugeridoCompleto.match(/-(\d{3})$/);
+                        if (match) numeroSugerido = match[1];
+                    } else if (origen === 'AMPA') {
+                        const match = sugeridoCompleto.match(/-(\d{3})A$/);
+                        if (match) numeroSugerido = match[1] + 'A';
+                    } else if (origen === 'Donado') {
+                        const match = sugeridoCompleto.match(/-(\d{3})D$/);
+                        if (match) numeroSugerido = match[1] + 'D';
+                    }
+                    
+                    if (numeroSugerido) {
+                        sigEjemplar.value = numeroSugerido;
+                        const nombreOrigen = origen === 'IES' ? 'IES' : (origen === 'AMPA' ? 'AMPA' : 'Donado');
+                        ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${nombreOrigen}: ${numeroSugerido} (puedes modificarlo)`;
+                    }
                 } else {
                     // Si no hay libros previos, empezar desde 001
                     if (origen === 'IES') {
@@ -2819,7 +2864,6 @@
                     }
                 }
             } else {
-                // Si no hay curso o materia, mostrar mensaje
                 sigEjemplar.value = '';
                 ayudaSpan.innerHTML = `📌 Primero selecciona curso y materia para obtener sugerencia automática`;
             }
