@@ -3752,7 +3752,7 @@
                     <td style="padding:6px; text-align:center;">${a.librosPrestados}</td>
                     <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
                     <td style="padding:6px;">
-                        ${!a.yaEntregado ? `<button ${onclickAction} style="background:#10b981;">📦 Preparar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}
+                        <button ${onclickAction} style="background:#10b981;">📦 Preparar lote</button>
                     </td>
                   </tr>
             `;
@@ -3760,6 +3760,7 @@
         html += `</tbody></table></div>`;
         resultadosDiv.innerHTML = html;
     }
+
     window.prepararLoteConAdvertencia = async (alumnoId, nombre) => {
         const confirmar = confirm(`⚠️ ATENCIÓN\n\nEl alumno ${nombre} NO es socio del AMPA ni tiene beca.\n\n¿Estás seguro de que quieres prepararle el lote de libros?`);
         
