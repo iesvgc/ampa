@@ -4055,41 +4055,85 @@
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        const anoId = currentAnoId;
+        // ✅ OBTENER AÑO DEL SELECTOR
+        const selectAno = document.getElementById('selectAnoAcademico');
+        const anoId = selectAno ? parseInt(selectAno.value) : null;
         
-        // Obtener alumnos con lote preparado (tienen préstamos activos Y lote_entregado = false)
-        const { data: prestamosActivos } = await supabase
-            .from('prestamos')
-            .select('alumno_id')
-            .eq('entregado', false)
-            .eq('ano_academico_id', anoId);
+        if (!anoId || isNaN(anoId)) {
+            resultadosDiv.innerHTML = '<p>Error: No hay año seleccionado</p>';
+            return;
+        }
         
-        const alumnosConPrestamos = [...new Set(prestamosActivos.map(p => p.alumno_id))];
+        // ✅ OBTENER TODOS LOS PRÉSTAMOS ACTIVOS (CON PAGINACIÓN)
+        let todosPrestamos = [];
+        let desde = 0;
+        const limite = 1000;
+        let hayMas = true;
+        
+        while (hayMas) {
+            const { data: prestamosPagina, error: pError } = await supabase
+                .from('prestamos')
+                .select('alumno_id')
+                .eq('entregado', false)
+                .eq('ano_academico_id', anoId)
+                .range(desde, desde + limite - 1);
+            
+            if (pError) {
+                console.error("Error al obtener préstamos:", pError);
+                break;
+            }
+            
+            if (!prestamosPagina || prestamosPagina.length === 0) {
+                hayMas = false;
+            } else {
+                todosPrestamos = todosPrestamos.concat(prestamosPagina);
+                desde += limite;
+                if (prestamosPagina.length < limite) hayMas = false;
+            }
+        }
+        
+        const alumnosConPrestamos = [...new Set(todosPrestamos.map(p => p.alumno_id))];
         
         if (alumnosConPrestamos.length === 0) {
             resultadosDiv.innerHTML = '<p>No hay alumnos con lotes preparados actualmente</p>';
             return;
         }
         
-        let query = supabase
-            .from('historial_alumnos')
-            .select('*, alumnos(*)')
-            .eq('ano_academico_id', anoId)
-            .in('alumno_id', alumnosConPrestamos)
-            .eq('lote_entregado', false);
+        // ✅ OBTENER TODOS LOS HISTORIALES (CON PAGINACIÓN)
+        let todosHistoriales = [];
+        desde = 0;
+        hayMas = true;
         
-        if (cursoFiltro) query = query.eq('curso', cursoFiltro);
-        if (grupoFiltro) query = query.eq('grupo', grupoFiltro);
-        
-        const { data: historiales, error } = await query;
-        
-        if (error) {
-            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
-            return;
+        while (hayMas) {
+            let query = supabase
+                .from('historial_alumnos')
+                .select('*, alumnos(*)')
+                .eq('ano_academico_id', anoId)
+                .in('alumno_id', alumnosConPrestamos)
+                .eq('lote_entregado', false)
+                .range(desde, desde + limite - 1);
+            
+            if (cursoFiltro) query = query.eq('curso', cursoFiltro);
+            if (grupoFiltro) query = query.eq('grupo', grupoFiltro);
+            
+            const { data: historialesPagina, error } = await query;
+            
+            if (error) {
+                resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+                return;
+            }
+            
+            if (!historialesPagina || historialesPagina.length === 0) {
+                hayMas = false;
+            } else {
+                todosHistoriales = todosHistoriales.concat(historialesPagina);
+                desde += limite;
+                if (historialesPagina.length < limite) hayMas = false;
+            }
         }
         
         let resultados = [];
-        for (const h of historiales || []) {
+        for (const h of todosHistoriales || []) {
             resultados.push({
                 id: h.alumnos.id,
                 nombre: h.alumnos.nombre,
