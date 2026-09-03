@@ -1532,18 +1532,59 @@
             return;
         }
         
-        // 2. Obtener TODOS los préstamos activos del año (una sola consulta)
-        const { data: todosPrestamos } = await supabaseDebug
-            .from('prestamos')
-            .select('*, libros(*)')
-            .eq('entregado', false)
-            .eq('ano_academico_id', anoId);
+        // 2. Obtener TODOS los préstamos activos del año (CON PAGINACIÓN)
+        let todosPrestamos = [];
+        let desde = 0;
+        const limite = 1000;
+        let hayMas = true;
         
-        // 3. Obtener TODOS los estados de entrega (una sola consulta)
-        const { data: todosEntregas } = await supabaseDebug
-            .from('historial_alumnos')
-            .select('alumno_id, lote_entregado')
-            .eq('ano_academico_id', anoId);
+        while (hayMas) {
+            const { data: prestamosPagina, error: pError } = await supabaseDebug
+                .from('prestamos')
+                .select('*, libros(*)')
+                .eq('entregado', false)
+                .eq('ano_academico_id', anoId)
+                .range(desde, desde + limite - 1);
+            
+            if (pError) {
+                console.error("Error al obtener préstamos:", pError);
+                break;
+            }
+            
+            if (!prestamosPagina || prestamosPagina.length === 0) {
+                hayMas = false;
+            } else {
+                todosPrestamos = todosPrestamos.concat(prestamosPagina);
+                desde += limite;
+                if (prestamosPagina.length < limite) hayMas = false;
+            }
+        }
+        
+        // 3. Obtener TODOS los estados de entrega (CON PAGINACIÓN)
+        let todosEntregas = [];
+        desde = 0;
+        hayMas = true;
+        
+        while (hayMas) {
+            const { data: entregasPagina, error: eError } = await supabaseDebug
+                .from('historial_alumnos')
+                .select('alumno_id, lote_entregado')
+                .eq('ano_academico_id', anoId)
+                .range(desde, desde + limite - 1);
+            
+            if (eError) {
+                console.error("Error al obtener entregas:", eError);
+                break;
+            }
+            
+            if (!entregasPagina || entregasPagina.length === 0) {
+                hayMas = false;
+            } else {
+                todosEntregas = todosEntregas.concat(entregasPagina);
+                desde += limite;
+                if (entregasPagina.length < limite) hayMas = false;
+            }
+        }
         
         // Crear mapas para acceso rápido
         const prestamosPorAlumno = {};
