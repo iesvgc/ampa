@@ -3,6 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <!-- FORZAR RECARGA SI HAY NUEVA VERSIÓN -->
+    <script>
+        const VERSION = "20260903v1";
+        if (localStorage.getItem('app_version') !== VERSION) {
+            localStorage.setItem('app_version', VERSION);
+            location.reload(true);
+        }
+    </script>
+    
+    <!-- EVITAR CACHÉ DEL NAVEGADOR -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+        
     <title>Banco de Libros</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
