@@ -226,6 +226,7 @@
     let html5QrCode = null;
     let currentTab = 'alumnos';
     let currentAnoId = null;
+    window.currentAnoId = currentAnoId;
     let currentEditingAlumnoId = null;
     let modoActual = "";
     let scannerActivo = false;
@@ -398,11 +399,13 @@
             if (ano.activo) {
                 option.selected = true;
                 currentAnoId = ano.id;
+                window.currentAnoId = currentAnoId;  // ← AÑADIR ESTA LÍNEA
             }
             select.appendChild(option);
         });
         select.addEventListener('change', (e) => {
             currentAnoId = parseInt(e.target.value);
+            window.currentAnoId = currentAnoId;  // ← AÑADIR ESTA LÍNEA
             if (currentTab) cargarTab(currentTab);
         });
     }
