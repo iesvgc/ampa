@@ -3226,102 +3226,93 @@
         
         // Aplicar filtros
         // Aplicar filtros
+        // ============ FILTROS DE ESTADO DE PRÉSTAMO ============
+        // Semántica:
+        //   PRESTADO  → préstamo activo Y alumno ya recogió/firmó el lote (lote_entregado = true)
+        //   PREPARADO → préstamo activo Y alumno aún NO ha recogido el lote (lote_entregado = false)
+        //   LIBRE     → sin ningún préstamo activo
         const estadoPrestamoFiltro = document.getElementById('filtroEstadoPrestamo').value;
         
-        // ✅ Función auxiliar con PAGINACIÓN para traer TODOS los préstamos activos del año
-        async function obtenerTodosPrestamosActivos(campos = 'libro_codigo') {
-            let todos = [];
-            let desde = 0;
+        async function obtenerPrestamosConEstadoLote() {
             const limite = 1000;
+            
+            // 1. Traer TODOS los préstamos activos del año (con order para paginar bien)
+            let prestamos = [];
+            let desde = 0;
             let hayMas = true;
             while (hayMas) {
                 const { data: pagina, error } = await supabase
                     .from('prestamos')
-                    .select(campos)
+                    .select('id, libro_codigo, alumno_id')
                     .eq('entregado', false)
                     .eq('ano_academico_id', currentAnoId)
+                    .order('id')
                     .range(desde, desde + limite - 1);
-                if (error) {
-                    console.error("Error al obtener préstamos:", error);
-                    break;
-                }
+                if (error) { console.error("Error al obtener préstamos:", error); break; }
                 if (!pagina || pagina.length === 0) {
                     hayMas = false;
                 } else {
-                    todos = todos.concat(pagina);
+                    prestamos = prestamos.concat(pagina);
                     desde += limite;
                     if (pagina.length < limite) hayMas = false;
                 }
             }
-            return todos;
+            
+            // 2. Mapa de lote_entregado por alumno en el año actual
+            const lotePorAlumno = new Map();
+            desde = 0;
+            hayMas = true;
+            while (hayMas) {
+                const { data: pagina, error } = await supabase
+                    .from('historial_alumnos')
+                    .select('alumno_id, lote_entregado')
+                    .eq('ano_academico_id', currentAnoId)
+                    .order('alumno_id')
+                    .range(desde, desde + limite - 1);
+                if (error) { console.error("Error al obtener historial:", error); break; }
+                if (!pagina || pagina.length === 0) {
+                    hayMas = false;
+                } else {
+                    for (const h of pagina) {
+                        lotePorAlumno.set(h.alumno_id, h.lote_entregado === true);
+                    }
+                    desde += limite;
+                    if (pagina.length < limite) hayMas = false;
+                }
+            }
+            
+            // 3. Clasificar cada préstamo según estado del lote del alumno
+            const codigosPrestados = [];    // lote ya entregado
+            const codigosPreparados = [];   // lote pendiente
+            for (const p of prestamos) {
+                if (lotePorAlumno.get(p.alumno_id) === true) {
+                    codigosPrestados.push(p.libro_codigo);
+                } else {
+                    codigosPreparados.push(p.libro_codigo);
+                }
+            }
+            return { codigosPrestados, codigosPreparados };
         }
         
         if (estadoPrestamoFiltro === 'prestado') {
-            const prestamosActivos = await obtenerTodosPrestamosActivos('libro_codigo');
-            const codigosPrestados = prestamosActivos.map(p => p.libro_codigo);
+            const { codigosPrestados } = await obtenerPrestamosConEstadoLote();
             if (codigosPrestados.length > 0) {
                 query = query.in('codigo_barras', codigosPrestados);
             } else {
                 query = query.in('codigo_barras', ['ninguno']);
             }
-        } 
-        else if (estadoPrestamoFiltro === 'libre') {
-            const prestamosActivos = await obtenerTodosPrestamosActivos('libro_codigo');
-            const codigosPrestados = prestamosActivos.map(p => p.libro_codigo);
-            if (codigosPrestados.length > 0) {
-                query = query.not('codigo_barras', 'in', `(${codigosPrestados.map(c => `"${c}"`).join(',')})`);
-            }
         }
         else if (estadoPrestamoFiltro === 'preparado') {
-            // Alumnos con lote preparado (lote_entregado = false) en el año actual
-            let alumnosIds = [];
-            let desde = 0;
-            let hayMas = true;
-            while (hayMas) {
-                const { data: pagina } = await supabase
-                    .from('historial_alumnos')
-                    .select('alumno_id')
-                    .eq('lote_entregado', false)
-                    .eq('ano_academico_id', currentAnoId)
-                    .range(desde, desde + 999);
-                if (!pagina || pagina.length === 0) hayMas = false;
-                else {
-                    alumnosIds = alumnosIds.concat(pagina.map(a => a.alumno_id));
-                    desde += 1000;
-                    if (pagina.length < 1000) hayMas = false;
-                }
-            }
-            
-            if (alumnosIds.length > 0) {
-                // Obtener préstamos de esos alumnos con paginación
-                let prestamosPreparados = [];
-                desde = 0;
-                hayMas = true;
-                while (hayMas) {
-                    const { data: pagina } = await supabase
-                        .from('prestamos')
-                        .select('libro_codigo')
-                        .eq('entregado', false)
-                        .eq('ano_academico_id', currentAnoId)
-                        .in('alumno_id', alumnosIds)
-                        .range(desde, desde + 999);
-                    if (!pagina || pagina.length === 0) hayMas = false;
-                    else {
-                        prestamosPreparados = prestamosPreparados.concat(pagina);
-                        desde += 1000;
-                        if (pagina.length < 1000) hayMas = false;
-                    }
-                }
-                
-                const codigosPreparados = prestamosPreparados.map(p => p.libro_codigo);
-                if (codigosPreparados.length > 0) {
-                    query = query.in('codigo_barras', codigosPreparados);
-                } else {
-                    query = query.in('codigo_barras', ['ninguno']);
-                }
+            const { codigosPreparados } = await obtenerPrestamosConEstadoLote();
+            if (codigosPreparados.length > 0) {
+                query = query.in('codigo_barras', codigosPreparados);
             } else {
                 query = query.in('codigo_barras', ['ninguno']);
             }
+        }
+        else if (estadoPrestamoFiltro === 'libre') {
+            // El filtro "libre" se aplica después en JS (evita Bad Request por URL larga)
+            window.__filtrarSoloLibres = true;
         }
     
         const verSoloBaja = document.getElementById('verLibrosInactivos')?.checked;
@@ -3372,15 +3363,7 @@
             return;
         }
         
-        const libros = todosLosLibros;
-        
-        if (!libros || libros.length === 0) {
-            resultadosDiv.innerHTML = '<p>No se encontraron libros</p>';
-            return;
-        }
-        
-        // Obtener TODOS los préstamos activos de una vez
-        // ✅ Obtener TODOS los préstamos activos del AÑO ACTUAL con PAGINACIÓN
+        // ✅ Obtener TODOS los préstamos activos del año (con .order para paginar correctamente)
         let todosPrestamos = [];
         let desdeP = 0;
         const limiteP = 1000;
@@ -3389,9 +3372,10 @@
         while (hayMasP) {
             const { data: prestamosPagina, error: pError } = await supabase
                 .from('prestamos')
-                .select('libro_codigo, alumnos(nombre)')
+                .select('id, libro_codigo, alumnos(nombre)')
                 .eq('entregado', false)
                 .eq('ano_academico_id', currentAnoId)
+                .order('id')
                 .range(desdeP, desdeP + limiteP - 1);
             
             if (pError) {
@@ -3409,8 +3393,22 @@
         }
     
         const prestamoMap = {};
+        const codigosPrestadosSet = new Set();
         for (const p of todosPrestamos || []) {
             prestamoMap[p.libro_codigo] = p.alumnos?.nombre || 'Alumno';
+            codigosPrestadosSet.add(p.libro_codigo);
+        }
+        
+        // ✅ Aplicar filtro "libre" en JS (evita Bad Request con URLs largas)
+        let libros = todosLosLibros;
+        if (window.__filtrarSoloLibres) {
+            libros = libros.filter(l => !codigosPrestadosSet.has(l.codigo_barras));
+            window.__filtrarSoloLibres = false;
+        }
+        
+        if (!libros || libros.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron libros con estos filtros</p>';
+            return;
         }
     
         // ✅ Bajas con paginación
