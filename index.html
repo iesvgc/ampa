@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <!-- FORZAR RECARGA SI HAY NUEVA VERSIÓN -->
     <script>
-        const VERSION = "20260903v3";
+        const VERSION = "20260903v4";
         if (localStorage.getItem('app_version') !== VERSION) {
             localStorage.setItem('app_version', VERSION);
             location.reload(true);
@@ -952,6 +952,7 @@
                 .select('*, alumnos(*)')
                 .eq('activo', true)
                 .eq('ano_academico_id', anoId)
+                .order('alumno_id')
                 .range(desde, desde + limite - 1);
             
             if (cursoFiltro) query = query.eq('curso', cursoFiltro);
@@ -981,9 +982,10 @@
         while (hayMas) {
             const { data: prestamosPagina, error: pError } = await supabaseDebug
                 .from('prestamos')
-                .select('alumno_id, id')
+                .select('*, libros(*)')
                 .eq('entregado', false)
                 .eq('ano_academico_id', anoId)
+                .order('id')
                 .range(desde, desde + limite - 1);
             
             if (pError) {
@@ -1624,6 +1626,7 @@
                 .select('*, libros(*)')
                 .eq('entregado', false)
                 .eq('ano_academico_id', anoId)
+                .order('id')
                 .range(desde, desde + limite - 1);
             
             if (pError) {
@@ -1650,6 +1653,7 @@
                 .from('historial_alumnos')
                 .select('alumno_id, lote_entregado')
                 .eq('ano_academico_id', anoId)
+                .order('alumno_id')
                 .range(desde, desde + limite - 1);
             
             if (eError) {
@@ -3845,6 +3849,7 @@
                 .select('*, alumnos(*)')
                 .eq('activo', true)
                 .eq('ano_academico_id', anoId)
+                .order('alumno_id')
                 .range(desde, desde + limite - 1);
             
             if (cursoFiltro) query = query.eq('curso', cursoFiltro);
@@ -3877,6 +3882,7 @@
                 .select('alumno_id, id')
                 .eq('entregado', false)
                 .eq('ano_academico_id', anoId)
+                .order('id')
                 .range(desde, desde + limite - 1);
             
             if (pError) {
@@ -4225,6 +4231,7 @@
                 .select('alumno_id')
                 .eq('entregado', false)
                 .eq('ano_academico_id', anoId)
+                .order('id')
                 .range(desde, desde + limite - 1);
             
             if (pError) {
@@ -4260,6 +4267,7 @@
                 .eq('ano_academico_id', anoId)
                 .in('alumno_id', alumnosConPrestamos)
                 .eq('lote_entregado', false)
+                .order('alumno_id')
                 .range(desde, desde + limite - 1);
             
             if (cursoFiltro) query = query.eq('curso', cursoFiltro);
@@ -4738,24 +4746,17 @@
         const anoId = anoActivo.id;
         
         // 1. Obtener historial de alumnos
-        let query = supabaseDebug
-            .from('historial_alumnos')
-            .select('*, alumnos(*)')
-            .eq('ano_academico_id', anoId);
-        
-        const { data: historiales, error } = await query;
-        
-        if (error) {
-            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
-            return;
-        }
+        // 1. Obtener historial de alumnos (con paginación)
+        const historiales = await traerTodo('historial_alumnos', '*, alumnos(*)', [
+            { op: 'eq', col: 'ano_academico_id', val: anoId }
+        ], { col: 'alumno_id' });
         
         // 2. Obtener TODOS los préstamos activos de una vez
-        const { data: todosPrestamos } = await supabaseDebug
-            .from('prestamos')
-            .select('alumno_id, id')
-            .eq('entregado', false)
-            .eq('ano_academico_id', anoId);
+        // 2. Obtener TODOS los préstamos activos (con paginación)
+        const todosPrestamos = await traerTodo('prestamos', 'alumno_id, id', [
+            { op: 'eq', col: 'entregado', val: false },
+            { op: 'eq', col: 'ano_academico_id', val: anoId }
+        ], { col: 'id' });
         
         // Crear mapa de conteo de préstamos por alumno
         const prestamosCount = {};
